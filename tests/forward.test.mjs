@@ -51,4 +51,6 @@ test('finds a TRN in document text', () => {
   assert.equal(findTrn('TRN 100234567890003.'), '100234567890003');
   assert.equal(findTrn('Phone 0501234567, licence 1234567'), null);
   assert.equal(findTrn('account 2100234567890003999'), null);
+  assert.equal(findTrn('Licence 0001918990 TRN 105293774300003 Mobile 971505113196'), '105293774300003');
+  assert.equal(findTrn('Tax Registration Number. Date of Issue 15/05/2026 ... 105293774300003'), '105293774300003');
 });
