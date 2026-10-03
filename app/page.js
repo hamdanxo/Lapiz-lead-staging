@@ -40,12 +40,25 @@ export default function Home() {
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [docsBy, setDocsBy] = useState({});
+
+  const loadDocs = useCallback(async (list) => {
+    const ids = list.map((d) => d.id);
+    if (!ids.length) { setDocsBy({}); return; }
+    try {
+      const { docs } = await api(`/api/docs?drafts=${ids.join(',')}`);
+      const by = {};
+      for (const doc of docs) (by[doc.draft_id] = by[doc.draft_id] || []).push(doc);
+      setDocsBy(by);
+    } catch { /* files are extra; the page still works without them */ }
+  }, []);
 
   const load = useCallback(async (t = tab) => {
     const j = await api(`/api/drafts?status=${t}`);
     setDrafts(j.drafts || []);
     setCounts(j.counts || {});
-  }, [tab]);
+    loadDocs(j.drafts || []);
+  }, [tab, loadDocs]);
 
   const loadMeta = useCallback(async () => {
     try { setMeta(await api('/api/meta')); } catch (e) { setNotice({ bad: true, text: e.message }); }
@@ -165,7 +178,8 @@ export default function Home() {
               selected={selected.has(d.id)} onToggle={() => toggle(d.id)}
               onLocal={(f) => patchLocal(d.id, f)} onSave={(f) => save(d.id, f)}
               onDelete={() => confirm('Delete this draft? It will not go to CRM.') && setStatus(d.id, 'delete')}
-              onPush={() => push([d.id])} busy={!!busy} />
+              onPush={() => push([d.id])} busy={!!busy}
+              docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} />
           ) : tab === 'filtered' ? (
             <div className="card" key={d.id}>
               <div className="card-head"><span className={`pill ${d.source}`}>{d.source}</span><span className="muted">{d.sender ? `+${d.sender}` : ''} · {when(d.created_at)}</span></div>
@@ -180,6 +194,8 @@ export default function Home() {
                 <span className="muted">→ {d.salesman_name || 'salesman'} · {when(d.pushed_at)} by {d.pushed_by}</span>
                 {d.crm_lead_id && <a className="link" href={CRM_LEAD_URL + d.crm_lead_id} target="_blank" rel="noreferrer">Open in CRM</a>}
               </div>
+              {d.push_error && <div className="alert warn small">{d.push_error}</div>}
+              <Docs d={d} docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} sent />
             </div>
           )
         )}
@@ -190,7 +206,7 @@ export default function Home() {
   );
 }
 
-function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onDelete, onPush, busy }) {
+function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onDelete, onPush, busy, docs, onDocs, onNotice }) {
   const [open, setOpen] = useState(false);
   const gaps = missing(d);
   const text = (k, label, props = {}) => (
@@ -249,6 +265,8 @@ function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onD
         </div>
       </div>
 
+      <Docs d={d} docs={docs} onDocs={onDocs} onNotice={onNotice} />
+
       {d.raw_text && (
         <div>
           <button className="link" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'} original message</button>
@@ -262,6 +280,85 @@ function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onD
           {gaps.length ? `Fill ${gaps.length} field${gaps.length > 1 ? 's' : ''}` : 'Push to CRM'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function size(n) {
+  if (!n) return '';
+  return n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+// Files on a lead: copied from the email automatically, or dropped in by hand.
+function Docs({ d, docs, onDocs, onNotice, sent = false }) {
+  const [over, setOver] = useState(false);
+  const [work, setWork] = useState('');
+  const inputId = `files-${d.id}`;
+  const isEmail = d.source === 'Email' && String(d.external_id || '').startsWith('email:');
+
+  async function upload(files) {
+    const list = [...files];
+    if (!list.length) return;
+    const notes = [];
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      setWork(`Uploading ${i + 1} of ${list.length}: ${f.name}`);
+      try {
+        if (f.size > 20 * 1024 * 1024) throw new Error('bigger than 20 MB');
+        const { path, token } = await api('/api/docs', { method: 'POST', body: JSON.stringify({ action: 'upload-url', draft_id: d.id, name: f.name, size: f.size }) });
+        const up = await supabaseBrowser().storage.from('lead-docs').uploadToSignedUrl(path, token, f, { contentType: f.type || 'application/octet-stream' });
+        if (up.error) throw new Error(up.error.message);
+        const r = await api('/api/docs', { method: 'POST', body: JSON.stringify({ action: 'register', draft_id: d.id, path, name: f.name, type: f.type }) });
+        if (r.note) notes.push(r.note);
+      } catch (e) { notes.push(`${f.name} not added: ${e.message}`); }
+    }
+    setWork('');
+    if (notes.length) onNotice({ bad: notes.some((n) => n.includes('not added') || n.includes('Not sent')), text: notes.join(' ') });
+    onDocs();
+  }
+
+  async function fromEmail() {
+    setWork('Getting files from the email…');
+    try {
+      const r = await api('/api/docs', { method: 'POST', body: JSON.stringify({ action: 'sync', draft_id: d.id }) });
+      onNotice({ bad: (r.note || '').includes('Not sent'), text: r.note || 'Done.' });
+    } catch (e) { onNotice({ bad: true, text: e.message }); }
+    setWork('');
+    onDocs();
+  }
+
+  async function remove(doc) {
+    try { await api('/api/docs', { method: 'DELETE', body: JSON.stringify({ id: doc.id }) }); onDocs(); }
+    catch (e) { onNotice({ bad: true, text: e.message }); }
+  }
+
+  return (
+    <div className="docs">
+      <div className="docs-head">
+        <span className="label">Documents{docs.length ? ` (${docs.length})` : ''}</span>
+        {isEmail && <button type="button" className="link" disabled={!!work} onClick={fromEmail}>Get files from email</button>}
+      </div>
+      {docs.length > 0 && (
+        <ul className="doc-list">
+          {docs.map((doc) => (
+            <li key={doc.id}>
+              <a href={doc.url || '#'} target="_blank" rel="noreferrer">{doc.name}</a>
+              <span className="muted small">{size(doc.size)}</span>
+              <span className={`tag ${doc.source === 'email' ? '' : 'ok'}`}>{doc.source === 'email' ? 'from email' : 'added'}</span>
+              {doc.crm_attachment_id && <span className="tag ok">in CRM</span>}
+              {!doc.crm_attachment_id && <button type="button" className="x small-x" title="Remove" onClick={() => remove(doc)}>×</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <label htmlFor={inputId}
+        className={`drop ${over ? 'over' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files); }}>
+        {work || (sent ? 'Drop files here to add them to the CRM lead, or click to choose' : 'Drop files here (trade licence, VAT certificate, BOQ…) or click to choose')}
+        <input id={inputId} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      </label>
     </div>
   );
 }
@@ -301,7 +398,7 @@ function Settings({ meta, salesmen, onClose }) {
         <h3>Zoho connections</h3>
         <ConnectBox kind="crm" title="Zoho CRM" connected={meta.connected.crm}
           help="Use a Self Client created while logged in as a CRM admin (e.g. Adil)."
-          scopes="ZohoCRM.modules.leads.ALL,ZohoCRM.users.READ,ZohoCRM.settings.fields.READ,ZohoCRM.settings.layouts.READ" />
+          scopes="ZohoCRM.modules.leads.ALL,ZohoCRM.modules.attachments.CREATE,ZohoCRM.users.READ,ZohoCRM.settings.fields.READ,ZohoCRM.settings.layouts.READ" />
         <ConnectBox kind="mail" title="Zoho Mail (Leads folder)" connected={meta.connected.mail}
           help="Use a Self Client created while logged in as tarun.s@lapizblue.com, because it reads that inbox."
           scopes="ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ" />
@@ -365,8 +462,9 @@ function ConnectBox({ kind, title, connected, help, scopes }) {
         <form onSubmit={go}>
           <p className="muted small">{help} In the API Console, Self Client &gt; Generate Code, paste these scopes, pick 10 minutes, then paste the code below right away.</p>
           <code className="scopes">{scopes}</code>
-          <label>Client ID<input value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} required /></label>
-          <label>Client Secret<input type="password" value={f.client_secret} onChange={(e) => setF({ ...f, client_secret: e.target.value })} required /></label>
+          {connected && <p className="muted small">Already connected: leave Client ID and Secret empty to keep the saved ones, and only paste the new code.</p>}
+          <label>Client ID<input value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} required={!connected} /></label>
+          <label>Client Secret<input type="password" value={f.client_secret} onChange={(e) => setF({ ...f, client_secret: e.target.value })} required={!connected} /></label>
           <label>Generated code<input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} required /></label>
           {msg && <div className={`alert ${msg.bad ? 'bad' : 'good'}`}>{msg.text}</div>}
           <button className="btn primary" disabled={busy}>{busy ? 'Connecting…' : 'Connect'}</button>

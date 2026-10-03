@@ -37,3 +37,18 @@ test('latest forward wins', () => {
   ];
   assert.equal(forwardedSalesman(subj, sent, users).id, '1');
 });
+
+import { normalizeUaePhone } from '../lib/text.js';
+test('phone typed as +971 050 keeps working', () => {
+  assert.equal(normalizeUaePhone('9710504369028'), '+971504369028');
+  assert.equal(normalizeUaePhone('+971 050 436 9028'), '+971504369028');
+  assert.equal(normalizeUaePhone('050 436 9028'), '+971504369028');
+});
+
+import { findTrn } from '../lib/text.js';
+test('finds a TRN in document text', () => {
+  assert.equal(findTrn('Tax Registration Number (TRN): 100 2345 6789 0003'), '100234567890003');
+  assert.equal(findTrn('TRN 100234567890003.'), '100234567890003');
+  assert.equal(findTrn('Phone 0501234567, licence 1234567'), null);
+  assert.equal(findTrn('account 2100234567890003999'), null);
+});

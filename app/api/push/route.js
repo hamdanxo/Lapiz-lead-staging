@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requireUser, json } from '@/lib/auth';
 import { crmCreateLead } from '@/lib/zoho';
+import { pushDocsToCrm } from '@/lib/docs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -36,7 +37,14 @@ export async function POST(req) {
     try {
       const leadId = await crmCreateLead(d);
       await db().from('drafts').update({ crm_lead_id: leadId, push_error: null }).eq('id', id);
-      results.push({ id, ok: true, crm_lead_id: leadId });
+      // Documents go to the lead after it exists. A failed file never undoes the lead.
+      let docNote = null;
+      try {
+        const r = await pushDocsToCrm(id, leadId);
+        if (r.failed.length) docNote = `Lead created, but these files did not attach: ${r.failed.join(', ')}`;
+      } catch (e) { docNote = `Lead created, but files did not attach: ${e.message}`; }
+      if (docNote) await db().from('drafts').update({ push_error: docNote.slice(0, 500) }).eq('id', id);
+      results.push({ id, ok: true, crm_lead_id: leadId, warning: docNote });
     } catch (e) {
       await db().from('drafts').update({ status: 'draft', pushed_at: null, pushed_by: null, push_error: e.message.slice(0, 500) }).eq('id', id);
       results.push({ id, ok: false, error: e.message });
