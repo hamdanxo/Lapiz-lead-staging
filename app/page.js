@@ -126,10 +126,10 @@ export default function Home() {
         </div>
       </header>
 
-      {(!meta.connected.crm || !meta.connected.mail) && (
+      {(meta.connected.crm === false || meta.connected.mail === false) && (
         <div className="alert warn">
-          {!meta.connected.crm && 'Zoho CRM is not connected yet. '}
-          {!meta.connected.mail && 'Zoho Mail is not connected yet. '}
+          {meta.connected.crm === false && 'Zoho CRM is not connected yet. '}
+          {meta.connected.mail === false && 'Zoho Mail is not connected yet. '}
           <button className="link" onClick={() => setShowSettings(true)}>Open Settings to connect</button>
         </div>
       )}

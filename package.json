@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --experimental-default-type=module --test tests/text.test.mjs"
+    "test": "node --experimental-default-type=module --test tests/text.test.mjs tests/forward.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
