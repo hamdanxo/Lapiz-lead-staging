@@ -14,6 +14,7 @@ create table if not exists drafts (
   phone text,
   email text,
   approx_qty text,
+  trn text,
   customer_category text,
   products text[] default '{}',
   salesman_id text,
@@ -47,3 +48,6 @@ insert into settings (key, value) values
   ('keywords', '["need","require","required","want","chahiye","quote","quotation","price","rate","available","stock","delivery","enquiry","inquiry","qty","quantity","bags","bag","kg","ltr","litre","liter","sqm","m2","drum","pail","pcs","carton","box","adhesive","grout","waterproofing","epoxy","primer","sealant","membrane","screed","paint","tools","mapei","kerakoll","weber","dulux","dewalt"]'),
   ('rotation', '{"ids":[],"next":0}')
 on conflict (key) do nothing;
+
+-- Update 2026-10-03: TRN column (safe to run again)
+alter table drafts add column if not exists trn text;

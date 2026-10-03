@@ -79,6 +79,7 @@ input, select, textarea { width: 100%; border: 1px solid var(--line); background
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue-soft); border-color: var(--blue); }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue); }
 .need { color: var(--red); }
+.field-err { color: var(--red); font-size: 12px; font-weight: 600; }
 .need input, .need select { border-color: #eaa59f; background: #fffafa; }
 
 .products { margin-top: 12px; }

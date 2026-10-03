@@ -11,6 +11,7 @@ function missing(d) {
   if (!d.salesman_id) m.push('Salesman');
   if (!d.customer_category) m.push('Customer Category');
   if (!d.products || !d.products.length) m.push('Products');
+  if (d.trn && !/^\d{15}$/.test(String(d.trn).replace(/\s/g, ''))) m.push('TRN (must be 15 digits)');
   return m;
 }
 

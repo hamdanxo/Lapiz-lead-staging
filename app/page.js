@@ -235,7 +235,8 @@ function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onD
         {text('contact_name', 'Contact person')}
         {text('phone', 'Phone')}
         {text('email', 'Email', { type: 'email' })}
-        {text('notes', 'Notes')}
+        {text('trn', 'TRN', { inputMode: 'numeric', maxLength: 15 })}
+        {text('notes', 'Notes / potential')}
       </div>
 
       <div className={`products ${gaps.includes('products') ? 'need' : ''}`}>

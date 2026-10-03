@@ -3,7 +3,7 @@ import { requireUser, json } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-const EDITABLE = ['company', 'contact_name', 'phone', 'email', 'approx_qty', 'customer_category', 'products', 'salesman_id', 'salesman_name', 'notes', 'source'];
+const EDITABLE = ['company', 'contact_name', 'phone', 'email', 'approx_qty', 'trn', 'customer_category', 'products', 'salesman_id', 'salesman_name', 'notes', 'source'];
 
 export async function GET(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;

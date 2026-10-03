@@ -41,3 +41,27 @@ test('Company names normalise for duplicate check', () => {
 test('HTML stripped to text', () => {
   assert.equal(stripHtml('<p>Hi&nbsp;there</p><br>Qty 40'), 'Hi there\nQty 40');
 });
+
+import { normalizeUaePhone, validTrn } from '../lib/text.js';
+
+test('UAE phone: accepts common formats, returns +971', () => {
+  for (const v of ['0501234567', '050 123 4567', '501234567', '+971 50 123 4567', '971501234567', '00971501234567']) {
+    assert.equal(normalizeUaePhone(v), '+971501234567', v);
+  }
+  assert.equal(normalizeUaePhone('04 123 4567'), '+97141234567');
+  assert.equal(normalizeUaePhone('02-1234567'), '+97121234567');
+});
+
+test('UAE phone: rejects wrong numbers', () => {
+  for (const v of ['12345', '0501234', '05012345678', '+91 98765 43210', '0812345678', 'abc', '']) {
+    assert.equal(normalizeUaePhone(v), null, v);
+  }
+});
+
+test('TRN must be exactly 15 digits', () => {
+  assert.ok(validTrn('100123456700003'));
+  assert.ok(validTrn('100 1234 5670 0003'));
+  assert.ok(!validTrn('10012345670000'));
+  assert.ok(!validTrn('1001234567000034'));
+  assert.ok(!validTrn('10012345670000A'));
+});
