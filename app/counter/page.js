@@ -69,7 +69,7 @@ export default function Counter() {
     return (
       <main className="center">
         <form className="panel narrow" onSubmit={unlock}>
-          <div className="brand"><span className="dot" />Counter Lead</div>
+          <div className="brand"><img src="/lapiz-logo-white.svg" alt="Lapiz Blue" className="logo" /><span className="sep" />Counter Lead</div>
           <p className="muted">Enter the counter PIN to log a walk-in customer.</p>
           <label>PIN<input inputMode="numeric" type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoFocus required /></label>
           {msg && <div className={`alert ${msg.bad ? 'bad' : 'good'}`}>{msg.text}</div>}
@@ -82,7 +82,7 @@ export default function Counter() {
   return (
     <main className="center">
       <form className="panel narrow" onSubmit={submit} noValidate>
-        <div className="brand"><span className="dot" />Counter Lead</div>
+        <div className="brand"><img src="/lapiz-logo-white.svg" alt="Lapiz Blue" className="logo" /><span className="sep" />Counter Lead</div>
 
         <label className={cls('company')}>Company / site name *
           <input value={f.company} onChange={set('company')} onBlur={blur('company')} autoFocus />

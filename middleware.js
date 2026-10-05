@@ -9,6 +9,8 @@ export async function middleware(req) {
   if (PUBLIC.some((p) => path === p || path.startsWith(p + '/'))) return NextResponse.next();
   // Every /api route checks the login itself (requireUser), so skip the second check here.
   if (path.startsWith('/api/')) return NextResponse.next();
+  // Public images (logo etc.) must load on the login and counter pages too.
+  if (/\.(svg|png|jpe?g|webp|ico)$/i.test(path)) return NextResponse.next();
 
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {

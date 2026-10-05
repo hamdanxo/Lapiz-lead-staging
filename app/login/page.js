@@ -19,7 +19,7 @@ export default function Login() {
   return (
     <main className="center">
       <form className="panel narrow" onSubmit={submit}>
-        <div className="brand"><span className="dot" />Lead Staging</div>
+        <div className="brand"><img src="/lapiz-logo-white.svg" alt="Lapiz Blue" className="logo" /><span className="sep" />Lead Staging</div>
         <p className="muted">Sign in to review leads before they go to Zoho CRM.</p>
         <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
         <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>

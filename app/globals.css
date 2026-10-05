@@ -52,6 +52,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .brand { display: flex; align-items: center; gap: 10px; font: 700 30px/1.1 var(--script); letter-spacing: 0.2px;
   background: linear-gradient(90deg, #e9d5ff, #f0abfc 50%, #a5b4fc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.logo { height: 28px; width: auto; display: block; flex: none; -webkit-text-fill-color: initial; }
+.sep { width: 1px; height: 26px; background: var(--edge); opacity: .8; flex: none; margin: 0 4px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--edge); box-shadow: 0 0 12px rgba(192, 38, 211, 0.8); flex: none; }
 .muted { color: var(--muted); }
 .small { font-size: 12.5px; }
@@ -179,7 +181,8 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent-s
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
   .top-actions .btn { padding: 8px 12px; }
-  .brand { font-size: 26px; }
+  .brand { font-size: 24px; }
+  .logo { height: 22px; }
   .card { padding: 14px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

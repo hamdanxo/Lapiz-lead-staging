@@ -129,7 +129,7 @@ export default function Home() {
   return (
     <div className="page">
       <header className="top">
-        <div className="brand"><span className="dot" />Lead Staging</div>
+        <div className="brand"><img src="/lapiz-logo-white.svg" alt="Lapiz Blue" className="logo" /><span className="sep" />Lead Staging</div>
         <div className="top-actions">
           <button className="btn primary" onClick={fetchLeads} disabled={!!busy}>{busy === 'fetch' ? 'Fetching…' : 'Fetch leads'}</button>
           <button className="btn" onClick={() => setShowSettings(true)}>Settings</button>
