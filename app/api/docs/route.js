@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { requireUser, json } from '@/lib/auth';
-import { BUCKET, MAX_BYTES, newPath, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, listDocs } from '@/lib/docs';
+import { BUCKET, MAX_BYTES, newPath, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, docsWithLinks } from '@/lib/docs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -14,13 +14,7 @@ async function draftOf(id) {
 export async function GET(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;
   const ids = (new URL(req.url).searchParams.get('drafts') || '').split(',').filter(Boolean).slice(0, 200);
-  const docs = await listDocs(ids);
-  if (!docs.length) return json({ docs: [] });
-  const { data: paths } = await db().from('draft_docs').select('id,path').in('id', docs.map((d) => d.id));
-  const pathById = Object.fromEntries((paths || []).map((p) => [p.id, p.path]));
-  const { data: links } = await db().storage.from(BUCKET).createSignedUrls(Object.values(pathById), 3600);
-  const urlByPath = Object.fromEntries((links || []).map((l) => [l.path, l.signedUrl]));
-  return json({ docs: docs.map((d) => ({ ...d, url: urlByPath[pathById[d.id]] || null })) });
+  return json({ docs: await docsWithLinks(ids) });
 }
 
 // { action: 'upload-url', draft_id, name, size }   -> where the browser should upload

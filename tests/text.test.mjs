@@ -11,12 +11,16 @@ test('Mayur number matches in any format', () => {
 });
 
 test('Mayur always a draft, even with no keyword', () => {
-  assert.deepEqual(classifyWhatsApp('971564221423', 'hi', cfg), { source: 'Mayur', status: 'draft' });
+  assert.deepEqual(classifyWhatsApp('971564221423', 'hi bro', cfg), { source: 'Mayur', status: 'followup', text: 'hi bro' });
+  assert.deepEqual(classifyWhatsApp('971564221423', '/lead ABC Contracting needs 50 bags Mapei', cfg), { source: 'Mayur', status: 'draft', text: 'ABC Contracting needs 50 bags Mapei' });
+  assert.equal(classifyWhatsApp('971564221423', 'ABC needs grout /LEAD', cfg).status, 'draft');
+  assert.equal(classifyWhatsApp('971564221423', '#lead: site in JVC', cfg).text, 'site in JVC');
+  assert.equal(classifyWhatsApp('971564221423', 'call me about the leader board', cfg).status, 'followup');
 });
 
 test('Customer with keyword is a draft, without is filtered', () => {
-  assert.deepEqual(classifyWhatsApp('971501111111', 'bhai need 40 bags', cfg), { source: 'WhatsApp', status: 'draft' });
-  assert.deepEqual(classifyWhatsApp('971501111111', 'good morning', cfg), { source: 'WhatsApp', status: 'filtered' });
+  assert.deepEqual(classifyWhatsApp('971501111111', 'bhai need 40 bags', cfg), { source: 'WhatsApp', status: 'draft', text: 'bhai need 40 bags' });
+  assert.deepEqual(classifyWhatsApp('971501111111', 'good morning', cfg), { source: 'WhatsApp', status: 'filtered', text: 'good morning' });
 });
 
 test('Keywords match whole words only', () => {

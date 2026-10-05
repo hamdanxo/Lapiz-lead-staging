@@ -7,6 +7,8 @@ const PUBLIC = ['/login', '/counter', '/api/counter', '/api/whatsapp'];
 export async function middleware(req) {
   const path = req.nextUrl.pathname;
   if (PUBLIC.some((p) => path === p || path.startsWith(p + '/'))) return NextResponse.next();
+  // Every /api route checks the login itself (requireUser), so skip the second check here.
+  if (path.startsWith('/api/')) return NextResponse.next();
 
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -19,8 +21,15 @@ export async function middleware(req) {
       },
     },
   });
-  const { data } = await supabase.auth.getUser();
-  const email = data && data.user && data.user.email;
+  let email = null;
+  try {
+    const { data } = await supabase.auth.getClaims();
+    email = data && data.claims && data.claims.email;
+  } catch {}
+  if (!email) {
+    const { data } = await supabase.auth.getUser();
+    email = data && data.user && data.user.email;
+  }
   const ok = !!email && (process.env.ALLOWED_EMAILS || '').toLowerCase().split(',').map((s) => s.trim()).includes(email.toLowerCase());
 
   if (!ok) {

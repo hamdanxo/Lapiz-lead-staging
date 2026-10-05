@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSetting } from '@/lib/db';
 import { classifyWhatsApp } from '@/lib/text';
+import { db } from '@/lib/db';
 import { insertDraft } from '@/lib/drafts';
 
 export const dynamic = 'force-dynamic';
@@ -44,15 +45,33 @@ export async function POST(req) {
           (m.button && m.button.text) ||
           (m.interactive && JSON.stringify(m.interactive)) ||
           `[${m.type} message]`;
-        const { source, status } = classifyWhatsApp(m.from, text, { mayurNumbers, keywords });
+        const { source, status, text: body } = classifyWhatsApp(m.from, text, { mayurNumbers, keywords });
         try {
+          if (status === 'followup') {
+            // Mayur's message without /lead: add it to his lead from the last 10 minutes,
+            // so he can send "/lead" and then forward the customer's details. Otherwise it is
+            // normal chat and is not stored.
+            const since = new Date(Date.now() - 10 * 60e3).toISOString();
+            const { data: last } = await db().from('drafts').select('id,raw_text')
+              .eq('source', 'Mayur').eq('status', 'draft').gte('created_at', since)
+              .order('created_at', { ascending: false }).limit(1);
+            const d = last && last[0];
+            if (d) {
+              await db().from('drafts').update({
+                raw_text: `${d.raw_text || ''}\n\n${body}`.slice(0, 20000),
+                parsed: false,
+                updated_at: new Date().toISOString(),
+              }).eq('id', d.id);
+            }
+            continue;
+          }
           await insertDraft({
             source, status,
             external_id: `wa:${m.id}`,
             sender: m.from,
             phone: source === 'Mayur' ? null : `+${m.from}`,
             contact_name: source === 'Mayur' ? null : names[m.from] || null,
-            raw_text: String(text).slice(0, 20000),
+            raw_text: String(body || text).slice(0, 20000),
           });
         } catch (e) {
           console.error('whatsapp insert failed', e.message);

@@ -42,26 +42,22 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [docsBy, setDocsBy] = useState({});
 
-  const loadDocs = useCallback(async (list) => {
-    const ids = list.map((d) => d.id);
-    if (!ids.length) { setDocsBy({}); return; }
-    try {
-      const { docs } = await api(`/api/docs?drafts=${ids.join(',')}`);
-      const by = {};
-      for (const doc of docs) (by[doc.draft_id] = by[doc.draft_id] || []).push(doc);
-      setDocsBy(by);
-    } catch { /* files are extra; the page still works without them */ }
-  }, []);
+  const groupDocs = (docs) => {
+    const by = {};
+    for (const doc of docs || []) (by[doc.draft_id] = by[doc.draft_id] || []).push(doc);
+    return by;
+  };
 
+  // Leads, counts and their files come back in one request.
   const load = useCallback(async (t = tab) => {
     const j = await api(`/api/drafts?status=${t}`);
     setDrafts(j.drafts || []);
     setCounts(j.counts || {});
-    loadDocs(j.drafts || []);
-  }, [tab, loadDocs]);
+    setDocsBy(groupDocs(j.docs));
+  }, [tab]);
 
-  const loadMeta = useCallback(async () => {
-    try { setMeta(await api('/api/meta')); } catch (e) { setNotice({ bad: true, text: e.message }); }
+  const loadMeta = useCallback(async (fresh = false) => {
+    try { setMeta(await api(`/api/meta${fresh ? '?fresh=1' : ''}`)); } catch (e) { setNotice({ bad: true, text: e.message }); }
   }, []);
 
   useEffect(() => { loadMeta(); }, [loadMeta]);
@@ -97,10 +93,12 @@ export default function Home() {
   }
 
   async function setStatus(id, action) {
+    const before = drafts;
+    setDrafts((ds) => ds.filter((d) => d.id !== id)); // gone from the screen straight away
     try {
       await api('/api/drafts', { method: 'PATCH', body: JSON.stringify({ id, action }) });
-      await load();
-    } catch (e) { setNotice({ bad: true, text: e.message }); }
+      load().catch(() => {});
+    } catch (e) { setDrafts(before); setNotice({ bad: true, text: e.message }); }
   }
 
   async function push(ids) {
@@ -201,7 +199,7 @@ export default function Home() {
         )}
       </section>
 
-      {showSettings && <Settings meta={meta} salesmen={salesmen} onClose={() => { setShowSettings(false); loadMeta(); }} />}
+      {showSettings && <Settings meta={meta} salesmen={salesmen} onClose={() => { setShowSettings(false); loadMeta(true); }} />}
     </div>
   );
 }
@@ -423,6 +421,7 @@ function Settings({ meta, salesmen, onClose }) {
             <textarea rows={4} value={kw} onChange={(e) => setKw(e.target.value)} />
 
             <h3>Mayur&apos;s WhatsApp numbers</h3>
+            <p className="muted small">Messages from these numbers become a lead only when they contain /lead. Anything he sends in the next 10 minutes is added to that lead. His normal chat is never saved.</p>
             <input value={mayur} onChange={(e) => setMayur(e.target.value)} />
 
             {msg && <div className={`alert ${msg.bad ? 'bad' : 'good'}`}>{msg.text}</div>}

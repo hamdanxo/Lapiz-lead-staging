@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { requireUser, json } from '@/lib/auth';
+import { docsWithLinks } from '@/lib/docs';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,16 +9,16 @@ const EDITABLE = ['company', 'contact_name', 'phone', 'email', 'approx_qty', 'tr
 export async function GET(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;
   const status = new URL(req.url).searchParams.get('status') || 'draft';
-  const q = db().from('drafts').select('*').eq('status', status)
-    .order(status === 'pushed' ? 'pushed_at' : 'created_at', { ascending: false }).limit(200);
-  const { data, error } = await q;
-  if (error) return json({ error: error.message }, 500);
-  const counts = {};
-  for (const s of ['draft', 'filtered', 'pushed']) {
-    const { count } = await db().from('drafts').select('id', { count: 'exact', head: true }).eq('status', s);
-    counts[s] = count || 0;
-  }
-  return json({ drafts: data, counts });
+  const count = (s) => db().from('drafts').select('id', { count: 'exact', head: true }).eq('status', s);
+  const [list, c1, c2, c3] = await Promise.all([
+    db().from('drafts').select('*').eq('status', status)
+      .order(status === 'pushed' ? 'pushed_at' : 'created_at', { ascending: false }).limit(200),
+    count('draft'), count('filtered'), count('pushed'),
+  ]);
+  if (list.error) return json({ error: list.error.message }, 500);
+  const drafts = list.data || [];
+  const docs = await docsWithLinks(drafts.map((d) => d.id)).catch(() => []);
+  return json({ drafts, docs, counts: { draft: c1.count || 0, filtered: c2.count || 0, pushed: c3.count || 0 } });
 }
 
 // Save edits, or change status: { id, action: 'delete' | 'restore' } or { id, fields: {...} }
