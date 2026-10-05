@@ -7,6 +7,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState('');
+
+  // Emails a link to /reset where a new password can be set.
+  async function forgot() {
+    setErr(''); setSent('');
+    if (!email.trim()) { setErr('Type your email first, then press Forgot password.'); return; }
+    setBusy(true);
+    const { error } = await supabaseBrowser().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset` });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else setSent(`If ${email.trim()} has an account, a reset link is on its way. Open it on this same computer and browser.`);
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -24,7 +36,9 @@ export default function Login() {
         <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
         <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
         {err && <div className="alert bad">{err}</div>}
-        <button className="btn primary wide" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        {sent && <div className="alert good">{sent}</div>}
+        <button className="btn primary wide" disabled={busy}>{busy ? 'Please wait…' : 'Sign in'}</button>
+        <button type="button" className="link small" onClick={forgot} disabled={busy}>Forgot password?</button>
       </form>
     </main>
   );

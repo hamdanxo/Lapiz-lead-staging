@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 // Pages that do not need a login.
-const PUBLIC = ['/login', '/counter', '/api/counter', '/api/whatsapp'];
+const PUBLIC = ['/login', '/reset', '/counter', '/api/counter', '/api/whatsapp'];
 
 export async function middleware(req) {
   const path = req.nextUrl.pathname;
