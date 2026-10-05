@@ -1,30 +1,17 @@
 'use client';
 import { useState } from 'react';
-import { supabaseBrowser } from '@/lib/supabase-browser';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState('');
-
-  // Emails a link to /reset where a new password can be set.
-  async function forgot() {
-    setErr(''); setSent('');
-    if (!email.trim()) { setErr('Type your email first, then press Forgot password.'); return; }
-    setBusy(true);
-    const { error } = await supabaseBrowser().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset` });
-    setBusy(false);
-    if (error) setErr(error.message);
-    else setSent(`If ${email.trim()} has an account, a reset link is on its way. Open it on this same computer and browser.`);
-  }
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setErr('');
-    const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim(), password });
-    if (error) { setErr(error.message); setBusy(false); return; }
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErr(j.error || 'Wrong code'); setBusy(false); setPin(''); return; }
     window.location.href = '/';
   }
 
@@ -32,13 +19,14 @@ export default function Login() {
     <main className="center">
       <form className="panel narrow" onSubmit={submit}>
         <div className="brand"><img src="/lapiz-logo-white.svg" alt="Lapiz Blue" className="logo" /><span className="sep" />Lead Staging</div>
-        <p className="muted">Sign in to review leads before they go to Zoho CRM.</p>
-        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
-        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+        <p className="muted">Enter the 6 digit code to open the lead app.</p>
+        <label>Code
+          <input type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} required autoFocus
+            style={{ letterSpacing: '8px', fontSize: 20, textAlign: 'center' }} />
+        </label>
         {err && <div className="alert bad">{err}</div>}
-        {sent && <div className="alert good">{sent}</div>}
-        <button className="btn primary wide" disabled={busy}>{busy ? 'Please wait…' : 'Sign in'}</button>
-        <button type="button" className="link small" onClick={forgot} disabled={busy}>Forgot password?</button>
+        <button className="btn primary wide" disabled={busy || pin.length !== 6}>{busy ? 'Checking…' : 'Open'}</button>
       </form>
     </main>
   );

@@ -119,7 +119,7 @@ export default function Home() {
   }
 
   async function signOut() {
-    await supabaseBrowser().auth.signOut();
+    await fetch('/api/logout', { method: 'POST' }).catch(() => {});
     window.location.href = '/login';
   }
 
