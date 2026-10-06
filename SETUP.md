@@ -1,67 +1,60 @@
-# Lead Staging: setup guide
+# Lead Staging: setup guide (new environment)
 
 What this is: one web page where leads from Mayur, Counter, WhatsApp and Email wait as drafts.
-You check and fix them, pick the salesman, then press Push to CRM. No Claude credits are used.
+You check and fix them, pick the salesman, then press Push to CRM. The AI pre-fill uses Groq's free tier.
+
+The app is already live at https://lapiz-lead-staging.vercel.app. Use this guide only to set it up again from scratch (new Supabase project, new Vercel project). For day-to-day work see `docs/WORKFLOW.md`.
 
 ---
 
 ## Step 1. Supabase: create the tables (2 min)
 
-1. Open your `lead-staging` project on supabase.com
+1. Open the project on supabase.com
 2. Left sidebar: **SQL Editor** > **New query**
-3. Open the file `supabase/schema.sql` from this folder, copy everything, paste it in
-4. Click **Run**. You should see "Success. No rows returned"
-
-## Step 2. Supabase: create the two logins (2 min)
-
-1. Left sidebar: **Authentication** > **Users** > **Add user** > **Create new user**
-2. Email: `tarun.s@lapizblue.com`, set a password, tick **Auto Confirm User**, click **Create user**
-3. Repeat for Hamdan's email
-4. Left sidebar: **Project Settings** (gear) > **API Keys** (or **API**)
-5. Keep this page open, you need two values in Step 4:
+3. Open `supabase/schema.sql` from this folder, copy everything, paste it in
+4. Click **Run**. You should see "Success. No rows returned". This also creates the private `lead-docs` file bucket.
+5. **Project Settings** (gear) > **API Keys**. You need two values in Step 3:
    - **anon / publishable** key
    - **service_role / secret** key (click Reveal). Never share this one.
 
-## Step 3. GitHub: put the code online (3 min)
+No Supabase user accounts are needed. The app has one shared login code (`APP_PIN`).
 
-1. Unzip `lead-staging.zip` on your computer
-2. On github.com click **+** (top right) > **New repository**
-3. Name: `lapiz-lead-staging`, choose **Private**, click **Create repository**
-4. On the empty repo page click **uploading an existing file**
-5. Open the unzipped folder, select **everything inside it** (not the folder itself), drag it onto the page
-6. Click **Commit changes**
+## Step 2. GitHub (already done)
 
-## Step 4. Vercel: go live (3 min, logged in as Tarun)
+The code lives at https://github.com/hamdanxo/Lapiz-lead-staging. Changes are committed from VS Code and pushed to `main`; never upload files through the GitHub website.
 
-1. vercel.com > **Add New** > **Project**
-2. Connect GitHub if asked, then pick `lapiz-lead-staging` > **Import**
-3. Open **Environment Variables** and add each line below (Key on the left, Value on the right):
+## Step 3. Vercel: go live (3 min)
+
+1. vercel.com > **Add New** > **Project** > import `Lapiz-lead-staging`
+2. **Environment Variables**: add each line (Key left, Value right)
 
 | Key | Value |
 |---|---|
-| NEXT_PUBLIC_SUPABASE_URL | https://lxnbxihkigjtbgrzfmks.supabase.co |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | the anon / publishable key from Step 2 |
-| SUPABASE_SERVICE_ROLE_KEY | the service_role / secret key from Step 2 |
-| ALLOWED_EMAILS | tarun.s@lapizblue.com,HAMDAN_EMAIL_HERE |
-| GROQ_API_KEY | your gsk_ key |
+| NEXT_PUBLIC_SUPABASE_URL | your Supabase project URL |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | anon / publishable key from Step 1 |
+| SUPABASE_SERVICE_ROLE_KEY | service_role / secret key from Step 1 |
+| APP_PIN | 6-digit login code for Tarun and Hamdan |
+| COUNTER_PIN | PIN for counter staff (4+ digits) |
+| GROQ_API_KEY | your `gsk_` key from console.groq.com |
 | GROQ_MODEL | llama-3.3-70b-versatile |
-| COUNTER_PIN | pick a 6 digit PIN for counter staff |
 | ZOHO_ACCOUNTS_URL | https://accounts.zoho.com |
 | ZOHO_API_URL | https://www.zohoapis.com |
 | ZOHO_MAIL_URL | https://mail.zoho.com |
 | ZOHO_LEAD_LAYOUT_ID | 4591049000000091055 |
 
-4. Click **Deploy**. Wait about 2 minutes. You get a link like `lapiz-lead-staging.vercel.app`
+3. **Deploy**. Wait about 2 minutes.
 
-## Step 5. Connect Zoho inside the app (5 min)
+Changing an env var later needs a **Redeploy** to take effect. Changing `APP_PIN` logs everyone out.
+
+## Step 4. Connect Zoho inside the app (5 min)
 
 Zoho needs **two** Self Clients, because two different people own the data:
 
 - **CRM** must be connected from a CRM admin login (Adil). Tarun is not a CRM user.
-- **Mail** must be connected from Tarun's login, because it reads Tarun's Leads folder.
+- **Mail** must be connected from Tarun's login, because it reads Tarun's "Leads" folder.
 
 For each one:
-1. Open the app, sign in, click **Settings**
+1. Open the app, sign in with the code, click **Settings**
 2. In a new tab open **api-console.zoho.com** logged in as the right person (Adil for CRM, Tarun for Mail)
 3. Open the **Self Client** (create one if that person has none) > **Generate Code** tab
 4. Copy the scopes shown in the app's Settings box, paste into **Scope**
@@ -70,13 +63,13 @@ For each one:
 
 Do it straight away, the code dies after 10 minutes.
 
-## Step 6. Last settings (1 min)
+## Step 5. Last settings (1 min)
 
-In **Settings**: tick the salesmen for round robin, check the keyword list, click **Save settings**.
+In **Settings**: tick the salesmen for round robin, check the keyword list and Mayur's numbers, click **Save settings**.
 
 ## Daily use
 
-- **Fetch leads**: pulls new emails from the Leads folder and lets the free AI fill in blanks
+- **Fetch leads**: pulls new emails from the Leads folder and lets the AI fill in blanks
 - Fix anything in red, change the salesman if needed
 - **Push to CRM** on one lead, or tick several and push together
 - **Filtered out** tab: WhatsApp chats that didn't look like leads. **Move to Drafts** if one was real
@@ -84,7 +77,6 @@ In **Settings**: tick the salesmen for round robin, check the keyword list, clic
 
 Counter staff use: `your-link.vercel.app/counter` with the PIN. They can only add leads, not see them.
 
-## WhatsApp (later, after Meta approval)
+## WhatsApp (not live yet)
 
-Webhook URL to give Meta: `your-link.vercel.app/api/whatsapp`
-Add two more Vercel variables then: `WHATSAPP_VERIFY_TOKEN` (any word you choose, same one typed in Meta) and `WHATSAPP_APP_SECRET` (from the Meta app settings).
+The webhook at `/api/whatsapp` expects Meta WhatsApp Cloud API payloads. When the provider is chosen, add `WHATSAPP_VERIFY_TOKEN` (any word you choose, same one typed in Meta) and `WHATSAPP_APP_SECRET` (from the Meta app settings) to Vercel and redeploy. See `docs/WORKFLOW.md` → Roadmap.
