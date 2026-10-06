@@ -72,3 +72,22 @@ alter table draft_docs enable row level security;
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('lead-docs', 'lead-docs', false, 20971520)
 on conflict (id) do nothing;
+
+-- Update 2026-10-06: WhatsApp rules (safe to run again)
+-- People saved in the staff phone's WhatsApp contacts, synced by Meta (smb_app_state_sync).
+-- Messages from them are never saved as leads.
+create table if not exists wa_contacts (
+  phone text primary key,             -- digits only, e.g. 971501234567
+  phone_key text not null,            -- last 9 digits: how UAE numbers are compared
+  name text,
+  updated_at timestamptz not null default now()
+);
+create index if not exists wa_contacts_key_idx on wa_contacts (phone_key);
+alter table wa_contacts enable row level security;
+
+-- Every WhatsApp message id we have handled, so Meta's retries are never processed twice.
+create table if not exists wa_seen (
+  id text primary key,
+  created_at timestamptz not null default now()
+);
+alter table wa_seen enable row level security;

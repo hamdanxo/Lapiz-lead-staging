@@ -92,7 +92,10 @@ Prerequisites: staff phone on the latest WhatsApp Business, number used in the a
    Meta's handshake (GET) should pass straight away.
 3. Meta Embedded Signup: log in as the portfolio admin, pick Lapiz Blue's Business Portfolio, choose the number already on the WhatsApp Business app, approve on the staff phone. **Decline chat-history sharing.**
 4. Dualhook shows the connection active and webhook deliveries green. Send a test message (see §9 step 8).
-5. Ask Dualhook support whether a signing secret for `x-hub-signature-256` is available. If yes, add it as `WHATSAPP_APP_SECRET` in Vercel and redeploy.
+5. Make sure the `smb_app_state_sync` webhook field is routed to our URL (Dualhook lists it as routable), and ask Dualhook to **trigger the initial contact sync** (Meta's SMB App Data API, must happen within 24 hours of connecting). Settings → "Ignore these numbers" then shows "N known contacts, last synced …". Without it, only the manual ignore list applies.
+6. Ask Dualhook support whether a signing secret for `x-hub-signature-256` is available. If yes, add it as `WHATSAPP_APP_SECRET` in Vercel and redeploy.
+
+Before deploying the WhatsApp rules (tables `wa_contacts`, `wa_seen`): run `supabase/schema.sql` once (§5).
 
 Keep-alive: Meta drops coexistence if the WhatsApp Business app on the phone isn't opened for ~14 days. Dualhook reminds at day 13. If it drops, reconnect from step 2.
 
@@ -123,6 +126,8 @@ Disconnect / rollback: Dualhook → disconnect, or on the phone WhatsApp Busines
 | Counter form: "Pick a category from the list" | CRM categories changed; the form reloads them on next PIN entry |
 | WhatsApp messages not arriving | Dualhook → delivery monitor (are posts leaving Meta?); Vercel → Logs filter `/api/whatsapp` (401 = `?key` in the registered URL doesn't match `WHATSAPP_WEBHOOK_KEY`, or `WHATSAPP_APP_SECRET` is set to the wrong secret); phone not opened for 14 days = coexistence dropped, reconnect |
 | WhatsApp: a staff reply or old chat became a lead | Should be impossible (`field !== 'messages'` skipped); report with the Vercel log line |
+| WhatsApp: a known person's message was saved | Settings shows "no contacts synced yet" → Dualhook hasn't triggered the contact sync; add the number to Ignore these numbers meanwhile |
+| WhatsApp: two entries for one number | The earlier one was pushed/deleted, or its last message is older than 7 days; both by design |
 
 ## 9. Testing before a release
 

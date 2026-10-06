@@ -26,9 +26,19 @@ Only Tarun and Hamdan log into the main app. One shared 6-digit code (`APP_PIN`)
 | **Email** | **Fetch leads** reads the newest 30 emails in Tarun's Zoho Mail "Leads" folder. Body becomes the raw text, attachments are copied in, a TRN is read out of PDFs (trade licence / VAT certificate). | Live |
 | **Counter** | Staff fill the form at `/counter` after entering `COUNTER_PIN`. Company, category and "potential" are required; phone must be a UAE number; TRN must be 15 digits. | Live |
 | **Mayur** | WhatsApp message to the company number from one of Mayur's numbers (Settings → Mayur's numbers) that contains `/lead` (also `#lead`). Anything else he sends in the next 10 minutes is appended to that lead. His normal chat is never stored. | Going live Oct 2026 via Meta coexistence (Dualhook trial) |
-| **WhatsApp** | Message to the company number from anyone else. Becomes a draft only if it contains a keyword from Settings (need, bags, mapei…). Otherwise it goes to **Filtered out**, where it can be moved to Drafts by hand. Replies the staff send from the phone are ignored. | Going live Oct 2026 via Meta coexistence (Dualhook trial) |
+| **WhatsApp** | Message to the company number from anyone else. See the WhatsApp rules below. | Going live Oct 2026 via Meta coexistence (Dualhook trial) |
 
-The company WhatsApp number stays on the staff phone (WhatsApp Business app) and keeps working as before; Meta simply also sends a copy of every incoming message to the app. Expect ordinary customer chatter to pile up in **Filtered out**; that is by design, and an "ignore these numbers" setting is a possible follow-up if it gets noisy.
+The company WhatsApp number stays on the staff phone (WhatsApp Business app) and keeps working as before; Meta simply also sends a copy of every incoming message to the app.
+
+### WhatsApp rules (non-Mayur numbers)
+
+1. **Known people are never saved.** Two sources: anyone saved in the staff phone's WhatsApp contacts (Meta syncs them to the app, table `wa_contacts`), and anyone on **Settings → Ignore these numbers**. Mayur's numbers are checked first and always work as above.
+2. **Any other number is a potential lead.** Its first message creates one entry, in **Filtered out** (or straight in **Drafts** if it already contains a keyword).
+3. **One entry per number.** While that number has an open entry (Drafts or Filtered out, not pushed or deleted) with a message in the last 7 days, new messages are added to it instead of creating another. The AI pre-fill runs again on the next Fetch.
+4. **A keyword promotes it.** When any message from that number contains a keyword from Settings, its entry moves from Filtered out to Drafts automatically.
+5. Replies the staff send from the phone, old chat history and Meta's retries never create or change entries.
+
+Contact sync detail: Meta only sends the phone's contacts after the partner (Dualhook) triggers the first sync, within 24 hours of connecting; after that, additions and removals arrive on their own. Until the first sync, only the manual ignore list applies.
 
 The source can be changed on a draft (e.g. an email that was really from Mayur).
 

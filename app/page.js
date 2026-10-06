@@ -426,6 +426,7 @@ function Settings({ meta, salesmen, onClose }) {
   const [rot, setRot] = useState([]);
   const [kw, setKw] = useState('');
   const [mayur, setMayur] = useState('');
+  const [ignore, setIgnore] = useState('');
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
@@ -434,6 +435,7 @@ function Settings({ meta, salesmen, onClose }) {
       setRot(j.rotation.ids || []);
       setKw((j.keywords || []).join(', '));
       setMayur((j.mayur_numbers || []).join(', '));
+      setIgnore((j.ignore_numbers || []).join(', '));
     }).catch((e) => setMsg({ bad: true, text: e.message }));
   }, []);
 
@@ -443,6 +445,7 @@ function Settings({ meta, salesmen, onClose }) {
         rotation_ids: rot,
         keywords: kw.split(',').map((x) => x.trim()).filter(Boolean),
         mayur_numbers: mayur.split(',').map((x) => x.trim()).filter(Boolean),
+        ignore_numbers: ignore.split(',').map((x) => x.trim()).filter(Boolean),
       }) });
       setMsg({ bad: false, text: 'Saved.' });
     } catch (e) { setMsg({ bad: true, text: e.message }); }
@@ -477,12 +480,19 @@ function Settings({ meta, salesmen, onClose }) {
             </div>
 
             <h3>WhatsApp keywords</h3>
-            <p className="muted small">A WhatsApp message (not from Mayur) becomes a draft only if it contains one of these words. Others go to Filtered out.</p>
+            <p className="muted small">A new WhatsApp number goes to Filtered out. As soon as any message from it contains one of these words, it moves to Drafts. All messages from one number in a week are kept together in one entry.</p>
             <textarea rows={4} value={kw} onChange={(e) => setKw(e.target.value)} />
 
             <h3>Mayur&apos;s WhatsApp numbers</h3>
             <p className="muted small">Messages from these numbers become a lead only when they contain /lead. Anything he sends in the next 10 minutes is added to that lead. His normal chat is never saved.</p>
             <input value={mayur} onChange={(e) => setMayur(e.target.value)} />
+
+            <h3>Ignore these numbers</h3>
+            <p className="muted small">Messages from these numbers are never saved (staff, suppliers, friends). Comma separated.
+              People saved in the phone&apos;s WhatsApp contacts are ignored automatically: {s.contacts && s.contacts.count
+                ? `${s.contacts.count} known contacts, last synced ${when(s.contacts.updated_at)}.`
+                : 'no contacts synced yet.'}</p>
+            <input value={ignore} onChange={(e) => setIgnore(e.target.value)} placeholder="9715..., 9715..." />
 
             {msg && <div className={`alert ${msg.bad ? 'bad' : 'good'}`}>{msg.text}</div>}
             <div className="row-end"><button className="btn primary" onClick={saveAll}>Save settings</button></div>

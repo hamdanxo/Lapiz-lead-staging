@@ -45,7 +45,7 @@ lib/
   groq.js      parseLead(): prompt + JSON parse + picklist validation
   drafts.js    insertDraft (round robin + dedupe on external_id), moveDraft (tab moves + CRM recall), fetchEmail, enrichPending (AI), flagDuplicates, salesmanNames, runFetch
   docs.js      storage paths, extractText (PDF/txt), storeDoc, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, docsWithLinks
-  whatsapp.js  webhookAuthorized() (signature or URL key, fail closed), messageText(). Unit-tested.
+  whatsapp.js  webhookAuthorized() (signature or URL key, fail closed), planMessage() (the WhatsApp rules), parseStateSync() (contacts), messageText(). Unit-tested.
   supabase-browser.js  anon client, used only for uploadToSignedUrl
 middleware.js  redirects to /login unless the cookie is valid; /login, /counter, /api/* and images are public
 supabase/schema.sql    full schema, idempotent, run in Supabase SQL Editor
@@ -72,9 +72,16 @@ One row per lead. Key columns:
 | `rotation` | `{ ids: [salesmanId…], next: n }` |
 | `keywords` | `["need", …]` |
 | `mayur_numbers` | `["9715…"]` digits only |
+| `ignore_numbers` | `["9715…"]` digits only; WhatsApp senders never saved |
 | `zoho_crm`, `zoho_mail` | `{ client_id, client_secret, refresh_token, access_token, expires_at, account_id?, folder_id?, sent_folder_id? }` |
 | `crm_cache` | `{ at, users, customerCategories, products }` 15-min cache |
 | `login_fail:<ip>` | `{ n, at }` lockout counter |
+
+### `wa_contacts`
+The staff phone's WhatsApp contacts, synced by Meta (`smb_app_state_sync`). `phone` digits (PK), `phone_key` = last 9 digits (indexed; how UAE numbers are compared), `name`, `updated_at`. A sender found here is never saved.
+
+### `wa_seen`
+Every WhatsApp message id handled (`id` PK). Inserted first with `ignoreDuplicates`; zero rows back = Meta retry, skip. If the table is missing the code falls back to the `external_id` check.
 
 ### `draft_docs`
 `draft_id → drafts.id` (cascade), `name, mime, size, path` (storage key `<draftId>/<ts>-<rand>-<safeName>`), `source` ∈ email | upload, `text` (extracted, ≤20 000 chars), `crm_attachment_id` (set once sent; `'sent'` if Zoho returned no id).
@@ -103,7 +110,7 @@ For each id: atomically `update status='pushed' where status='draft'` (claims th
 - Listing: `GET /api/drafts` returns docs with 1-hour signed URLs in the same response as the drafts.
 
 ### WhatsApp (`/api/whatsapp`, Meta Cloud API format)
-`GET` answers Meta's verification (`hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`). `POST` must pass `webhookAuthorized()` (`lib/whatsapp.js`): if `WHATSAPP_APP_SECRET` is set, `x-hub-signature-256` must match; otherwise the `?key=` in the URL must equal `WHATSAPP_WEBHOOK_KEY`; with neither set every post is rejected (401). Only `changes[].field === 'messages'` is processed; coexistence extras (`smb_message_echoes` = staff replies from the phone, `history`, `smb_app_state_sync`) are skipped. For each message: `messageText(m)` → `classifyWhatsApp(sender, text)` → Mayur+`/lead` = draft (source Mayur); Mayur without tag = append to his draft from the last 10 min, else drop; others = draft if keyword, else filtered. `external_id = wa:<message id>` makes Meta's retries harmless. Always returns 200 fast so Meta doesn't retry.
+`GET` answers Meta's verification (`hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`). `POST` must pass `webhookAuthorized()` (`lib/whatsapp.js`): if `WHATSAPP_APP_SECRET` is set, `x-hub-signature-256` must match; otherwise the `?key=` in the URL must equal `WHATSAPP_WEBHOOK_KEY`; with neither set every post is rejected (401). `changes[].field === 'smb_app_state_sync'` → `parseStateSync()` → upsert/delete `wa_contacts`. `field === 'messages'` is processed; `smb_message_echoes` (staff replies) and `history` are skipped. For each message: `firstTime(id)` (wa_seen) → `messageText(m)` → look up `isKnown(from)` (wa_contacts by last 9 digits) and `openEntry(from)` (WhatsApp draft/filtered with `updated_at` in the last 7 days) → `planMessage()` (`lib/whatsapp.js`, pure, tested): Mayur rules first; known/ignored → nothing; existing entry → append text, `parsed=false`, and `status='draft'` if the text has a keyword; else insert filtered/draft. `external_id = wa:<message id>` is a second guard against duplicates. Always returns 200 fast so Meta doesn't retry.
 
 Why the URL key: Meta signs webhooks with the secret of the app that holds the subscription. Through a coexistence partner that is the partner's app, so the signature usually can't be checked by us; the registered URL (query string included) is the shared secret instead.
 
