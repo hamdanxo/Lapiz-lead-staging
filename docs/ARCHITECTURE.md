@@ -27,7 +27,7 @@ app/
     login/route.js     check APP_PIN, set signed cookie; 10 wrong tries per IP = 15 min lock (stored in settings)
     logout/route.js    clear cookie
     meta/route.js      salesmen + picklists (15 min cache) + which Zoho connections exist
-    drafts/route.js    GET list by status (+counts +docs); PATCH edit fields / delete / restore / remove_sent
+    drafts/route.js    GET list by status (+counts +docs); PATCH edit fields / delete / move (incl. recall) / remove_sent
     fetch/route.js     POST → lib/drafts.runFetch()
     push/route.js      POST {ids} → create CRM leads + attach docs
     docs/route.js      GET links; POST upload-url / register / sync; DELETE file
@@ -43,7 +43,7 @@ lib/
   text.js      pure helpers: phone/TRN/company normalisation, keyword match, WhatsApp classify, round robin, HTML strip, forward detection, TRN finder. Unit-tested.
   zoho.js      OAuth token refresh, CRM users/picklists (cached), create lead, attach file, Mail folder/message/attachment reads
   groq.js      parseLead(): prompt + JSON parse + picklist validation
-  drafts.js    insertDraft (round robin + dedupe on external_id), fetchEmail, enrichPending (AI), flagDuplicates, salesmanNames, runFetch
+  drafts.js    insertDraft (round robin + dedupe on external_id), moveDraft (tab moves + CRM recall), fetchEmail, enrichPending (AI), flagDuplicates, salesmanNames, runFetch
   docs.js      storage paths, extractText (PDF/txt), storeDoc, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, docsWithLinks
   supabase-browser.js  anon client, used only for uploadToSignedUrl
 middleware.js  redirects to /login unless the cookie is valid; /login, /counter, /api/* and images are public
@@ -94,6 +94,9 @@ Each step reports separately; UI shows `Fetched: N new emails, M pre-filled by A
 ### Push (`POST /api/push {ids}`)
 For each id: atomically `update status='pushed' where status='draft'` (claims the row; a double click can't create two leads) → validate required fields (revert to draft if missing) → `crmCreateLead` → save `crm_lead_id` → `pushDocsToCrm` (per-file errors go into `push_error` as a warning) → on CRM error revert to draft and store the message.
 
+### Move / recall (`PATCH /api/drafts {action:'move', ids, to}`)
+`to` ∈ draft | filtered. For each id `moveDraft(id, to)` (`lib/drafts.js`): `canMove(status, to)` (`lib/text.js`) allows draft↔filtered and pushed→draft/filtered only. From `pushed` it first calls `crmDeleteLead(crm_lead_id)` (`lib/zoho.js`, `DELETE /crm/v8/Leads/{id}`; "already gone" counts as success, anything else such as a converted lead aborts with Zoho's message), then nulls `draft_docs.crm_attachment_id` for the draft. The final update is `.eq('status', <old status>)` so a concurrent move becomes a no-op reported as an error. Clears `crm_lead_id, pushed_at, pushed_by, push_error`. Returns `{ results: [{ id, ok, error }] }`. `action:'restore'` is kept as an alias for move-to-draft.
+
 ### Documents
 - Upload: browser asks `POST /api/docs {action:'upload-url'}` → signed upload URL → browser uploads directly to Storage → `POST {action:'register'}` → server downloads it, extracts text, inserts `draft_docs`, runs `trnFromDocs`; if the draft is already pushed, sends the file to CRM immediately.
 - Listing: `GET /api/drafts` returns docs with 1-hour signed URLs in the same response as the drafts.
@@ -110,7 +113,7 @@ For each id: atomically `update status='pushed' where status='draft'` (claims th
 - `connect(kind, …)` swaps the 10-minute grant code for a refresh token and stores it in `settings.zoho_<kind>`. Reconnecting with only a new code reuses the saved client id/secret.
 - `token(kind)` refreshes the access token when it is within 60 s of expiry.
 - Picklists come from the Leads layout `ZOHO_LEAD_LAYOUT_ID` (layout-specific values), falling back to module fields. Cached 15 min in memory and in `settings.crm_cache`.
-- CRM endpoints used: `/crm/v8/users`, `/crm/v8/settings/layouts/{id}?module=Leads`, `/crm/v8/settings/fields?module=Leads`, `POST /crm/v8/Leads` (with `trigger:['workflow']` and `Layout`), `POST /crm/v8/Leads/{id}/Attachments` (multipart).
+- CRM endpoints used: `/crm/v8/users`, `/crm/v8/settings/layouts/{id}?module=Leads`, `/crm/v8/settings/fields?module=Leads`, `POST /crm/v8/Leads` (with `trigger:['workflow']` and `Layout`), `POST /crm/v8/Leads/{id}/Attachments` (multipart), `DELETE /crm/v8/Leads/{id}` (recall; needs `leads.ALL`, already in scope).
 - Mail endpoints: `/api/accounts`, `/api/accounts/{id}/folders`, `/api/accounts/{id}/messages/view?folderId=…`, `/messages/{id}/content`, `/messages/{id}/attachmentinfo`, `/messages/{id}/attachments/{attId}`.
 - "Open in CRM" link uses the hardcoded org URL in `app/page.js` (`CRM_LEAD_URL`).
 

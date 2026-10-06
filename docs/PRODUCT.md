@@ -50,8 +50,27 @@ Push creates a Zoho CRM Lead with: Company, Last Name (contact or company), Lead
 ## Tabs
 
 - **Drafts**: waiting for review. Select all ready → push together.
-- **Filtered out**: WhatsApp messages without a keyword. "Move to Drafts" if one was real.
-- **Sent to CRM**: everything pushed, with "Open in CRM". Can be removed from the list (the CRM lead is untouched).
+- **Filtered out**: WhatsApp messages without a keyword, or anything parked there by hand. "Move to Drafts" if one was real.
+- **Sent to CRM**: everything pushed, with "Open in CRM". Can be recalled (see below) or removed from the list (the CRM lead is untouched).
+
+## Moving leads between tabs
+
+A lead can be moved one at a time (buttons on the card) or several at once (tick, then the bar above the list):
+
+| From → To | Button | What happens |
+|---|---|---|
+| Drafts → Filtered out | Move to Filtered out | Parks it. Nothing else changes. |
+| Filtered out → Drafts | Move to Drafts | Back for review. |
+| Sent to CRM → Drafts | Recall to Drafts | **Recall.** The lead is deleted in Zoho CRM (Zoho keeps it in its Recycle Bin for 60 days), its documents are marked "not in CRM" so the next push re-attaches them, and the card returns to Drafts with all its fields so it can be fixed and pushed again as a fresh CRM lead. |
+| Sent to CRM → Filtered out | Recall to Filtered out | Same recall, parked instead. |
+
+Recall limits, shown in the confirm dialog:
+- Emails Zoho already sent to the salesman when the lead was created cannot be undone.
+- Notes the salesman typed on the CRM lead go to the Recycle Bin with it.
+- If the salesman already **converted** the lead to a Deal, Zoho refuses to delete it. The app shows the error and leaves the lead in Sent to CRM. Undo the conversion in Zoho first.
+- If the lead was already deleted in Zoho by hand, the recall still goes through.
+
+Pushing is never a "move": it always goes through Push to CRM, which checks the required fields.
 
 ## Settings (inside the app)
 

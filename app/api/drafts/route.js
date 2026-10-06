@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requireUser, json } from '@/lib/auth';
 import { docsWithLinks } from '@/lib/docs';
+import { moveDraft } from '@/lib/drafts';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +22,24 @@ export async function GET(req) {
   return json({ drafts, docs, counts: { draft: c1.count || 0, filtered: c2.count || 0, pushed: c3.count || 0 } });
 }
 
-// Save edits, or change status: { id, action: 'delete' | 'restore' } or { id, fields: {...} }
+// Save edits, or change status:
+//   { id, fields: {...} }                        edit a draft
+//   { id, action: 'delete' }                     hide a draft
+//   { ids: [...], action: 'move', to: 'draft' | 'filtered' }   move between tabs; from Sent to CRM = recall
+//   { id, action: 'restore' }                    old name for move to draft
+//   { ids: [...], action: 'remove_sent' }        hide pushed leads from the list, CRM untouched
 export async function PATCH(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;
   const body = await req.json();
+
+  if (body.action === 'move' || body.action === 'restore') {
+    const to = body.action === 'restore' ? 'draft' : body.to;
+    if (!['draft', 'filtered'].includes(to)) return json({ error: 'Can only move to Drafts or Filtered out' }, 400);
+    const ids = (body.ids || (body.id ? [body.id] : [])).filter(Boolean).slice(0, 500);
+    const results = [];
+    for (const id of ids) results.push({ id, ...(await moveDraft(id, to)) });
+    return json({ results });
+  }
 
   // { ids: [...], action: 'remove_sent' } clears leads from the "Sent to CRM" list.
   // Only the app's copy is hidden; the lead in Zoho CRM is not touched.
@@ -44,7 +59,6 @@ export async function PATCH(req) {
 
   let patch = { updated_at: new Date().toISOString() };
   if (body.action === 'delete') patch.status = 'deleted';
-  else if (body.action === 'restore') patch.status = 'draft';
   else {
     for (const k of EDITABLE) if (k in (body.fields || {})) patch[k] = body.fields[k];
   }

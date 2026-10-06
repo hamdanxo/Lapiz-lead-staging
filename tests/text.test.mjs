@@ -46,6 +46,20 @@ test('HTML stripped to text', () => {
   assert.equal(stripHtml('<p>Hi&nbsp;there</p><br>Qty 40'), 'Hi there\nQty 40');
 });
 
+import { canMove } from '../lib/text.js';
+
+test('Leads move between tabs, but never out of or into deleted', () => {
+  assert.ok(canMove('draft', 'filtered'));
+  assert.ok(canMove('filtered', 'draft'));
+  assert.ok(canMove('pushed', 'draft'));
+  assert.ok(canMove('pushed', 'filtered'));
+  assert.ok(!canMove('draft', 'draft'));
+  assert.ok(!canMove('draft', 'pushed'));   // pushing goes through /api/push
+  assert.ok(!canMove('deleted', 'draft'));
+  assert.ok(!canMove('pushed', 'deleted'));
+  assert.ok(!canMove('nonsense', 'draft'));
+});
+
 import { normalizeUaePhone, validTrn } from '../lib/text.js';
 
 test('UAE phone: accepts common formats, returns +971', () => {
