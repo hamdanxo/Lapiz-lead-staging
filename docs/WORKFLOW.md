@@ -119,6 +119,7 @@ Disconnect / rollback: Dualhook → disconnect, or on the phone WhatsApp Busines
 | Push: "Fill in: Products" | Product chips empty because CRM picklists failed to load; press Fetch (refreshes cache) |
 | Push: CRM rejected the lead (field name in brackets) | That field's value isn't a valid picklist option in the Leads layout; fix in CRM or in the draft |
 | Documents "not added" | File > 20 MB, or Storage bucket `lead-docs` missing (run `schema.sql`) |
+| Recall: "Zoho would not delete this lead" | The salesman converted it to a Deal/Contact in Zoho. Undo the conversion in Zoho, or leave it; the app keeps it in Sent to CRM |
 | Counter form: "Pick a category from the list" | CRM categories changed; the form reloads them on next PIN entry |
 | WhatsApp messages not arriving | Dualhook → delivery monitor (are posts leaving Meta?); Vercel → Logs filter `/api/whatsapp` (401 = `?key` in the registered URL doesn't match `WHATSAPP_WEBHOOK_KEY`, or `WHATSAPP_APP_SECRET` is set to the wrong secret); phone not opened for 14 days = coexistence dropped, reconnect |
 | WhatsApp: a staff reply or old chat became a lead | Should be impossible (`field !== 'messages'` skipped); report with the Vercel log line |
@@ -132,7 +133,8 @@ Minimum manual pass on the preview or live URL:
 4. Drop a small PDF on a draft, it appears with a link; remove it.
 5. Push one obviously fake test lead, "Open in CRM" works, then delete it in Zoho CRM and remove from the Sent list.
 6. `/counter` with the PIN: save a lead, it appears in Drafts with source Counter.
-7. WhatsApp (once connected): Mayur sends `/lead TEST …` → Mayur draft; a message with a keyword from another phone → WhatsApp draft; `hello` → Filtered out; a staff reply from the phone → nothing. Delete the test drafts.
+7. Recall round-trip: push a fake test lead, **Recall to Drafts** → it is back in Drafts with no CRM link and the lead sits in Zoho's Recycle Bin; push again → new CRM lead with the documents re-attached. Then Delete it in the app.
+8. WhatsApp (once connected): Mayur sends `/lead TEST …` → Mayur draft; a message with a keyword from another phone → WhatsApp draft; `hello` → Filtered out; a staff reply from the phone → nothing. Delete the test drafts.
 
 ## 10. Roadmap (as of October 2026)
 

@@ -101,6 +101,29 @@ export default function Home() {
     } catch (e) { setDrafts(before); setNotice({ bad: true, text: e.message }); }
   }
 
+  // Move leads to another tab. From Sent to CRM this is a recall: the CRM lead is deleted too.
+  async function move(ids, to, confirmText) {
+    if (!ids.length) return;
+    if (confirmText && !confirm(confirmText)) return;
+    const before = drafts;
+    setDrafts((ds) => ds.filter((d) => !ids.includes(d.id)));
+    setSelected(new Set());
+    try {
+      const { results } = await api('/api/drafts', { method: 'PATCH', body: JSON.stringify({ action: 'move', ids, to }) });
+      const ok = results.filter((r) => r.ok).length;
+      const bad = results.filter((r) => !r.ok);
+      await load();
+      const where = to === 'draft' ? 'Drafts' : 'Filtered out';
+      setNotice({
+        bad: bad.length > 0,
+        text: `${ok} moved to ${where}.${bad.length ? ` ${bad.length} not moved: ${bad.map((b) => b.error).join(' | ')}` : ''}`,
+      });
+    } catch (e) { setDrafts(before); setNotice({ bad: true, text: e.message }); }
+  }
+
+  const recallText = (n, name) =>
+    `Recall ${n === 1 ? `"${name}"` : `${n} leads`}? This deletes ${n === 1 ? 'the lead' : 'them'} from Zoho CRM (Zoho keeps deleted leads in its Recycle Bin for 60 days) and brings ${n === 1 ? 'it' : 'them'} back here so you can fix and push again. Emails Zoho already sent to the salesman cannot be undone.`;
+
   async function push(ids) {
     if (!ids.length) return;
     setBusy('push'); setNotice(null);
@@ -189,6 +212,9 @@ export default function Home() {
               onChange={(e) => setSelected(e.target.checked ? new Set(drafts.map((d) => d.id)) : new Set())} />
             Select all ({drafts.length})
           </label>
+          <button className="btn primary" disabled={!selected.size} onClick={() => move([...selected], 'draft', recallText(selected.size))}>
+            {`Recall ${selected.size || ''} to Drafts`}
+          </button>
           <button className="btn danger" disabled={!selected.size} onClick={() => removeSent([...selected])}>
             {`Remove ${selected.size || ''} from list`}
           </button>
@@ -203,13 +229,14 @@ export default function Home() {
               selected={selected.has(d.id)} onToggle={() => toggle(d.id)}
               onLocal={(f) => patchLocal(d.id, f)} onSave={(f) => save(d.id, f)}
               onDelete={() => confirm('Delete this draft? It will not go to CRM.') && setStatus(d.id, 'delete')}
+              onFilter={() => move([d.id], 'filtered')}
               onPush={() => push([d.id])} busy={!!busy}
               docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} />
           ) : tab === 'filtered' ? (
             <div className="card" key={d.id}>
               <div className="card-head"><span className={`pill ${d.source}`}>{d.source}</span><span className="muted">{d.sender ? `+${d.sender}` : ''} · {when(d.created_at)}</span></div>
               <pre className="raw">{d.raw_text}</pre>
-              <div className="row-end"><button className="btn" onClick={() => setStatus(d.id, 'restore')}>Move to Drafts</button></div>
+              <div className="row-end"><button className="btn" onClick={() => move([d.id], 'draft')}>Move to Drafts</button></div>
             </div>
           ) : (
             <div className={`card sent ${selected.has(d.id) ? 'picked' : ''}`} key={d.id}>
@@ -222,6 +249,10 @@ export default function Home() {
               </div>
               {d.push_error && <div className="alert warn small">{d.push_error}</div>}
               <Docs d={d} docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} sent />
+              <div className="row-end">
+                <button className="btn ghost" onClick={() => move([d.id], 'filtered', recallText(1, d.company))}>Recall to Filtered out</button>
+                <button className="btn" onClick={() => move([d.id], 'draft', recallText(1, d.company))}>Recall to Drafts</button>
+              </div>
             </div>
           )
         )}
@@ -232,7 +263,7 @@ export default function Home() {
   );
 }
 
-function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onDelete, onPush, busy, docs, onDocs, onNotice }) {
+function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onDelete, onFilter, onPush, busy, docs, onDocs, onNotice }) {
   const [open, setOpen] = useState(false);
   const gaps = missing(d);
   const text = (k, label, props = {}) => (
@@ -301,6 +332,7 @@ function DraftCard({ d, meta, salesmen, selected, onToggle, onLocal, onSave, onD
       )}
 
       <div className="row-end">
+        <button className="btn ghost" onClick={onFilter}>Move to Filtered out</button>
         <button className="btn ghost danger" onClick={onDelete}>Delete</button>
         <button className="btn primary" disabled={gaps.length > 0 || busy} onClick={onPush}>
           {gaps.length ? `Fill ${gaps.length} field${gaps.length > 1 ? 's' : ''}` : 'Push to CRM'}
