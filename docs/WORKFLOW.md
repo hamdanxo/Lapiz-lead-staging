@@ -79,6 +79,25 @@ Steps (first time or when adding a scope):
 
 Refresh tokens don't expire on their own. A reconnect is needed if the token was revoked, the scopes changed, or the error says "token refresh failed".
 
+## 6b. WhatsApp: connect or reconnect (Dualhook coexistence)
+
+The company number stays on the staff phone's WhatsApp Business app. Dualhook (dualhook.com, $12/month, 14-day trial) switches on Meta's "coexistence" and registers our URL so Meta posts incoming messages straight to the app.
+
+Prerequisites: staff phone on the latest WhatsApp Business, number used in the app for 7+ days, Hamdan is admin of the Meta Business Portfolio, two secrets generated and stored in a password manager (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_WEBHOOK_KEY`, 32+ random characters each).
+
+1. Vercel → Environment Variables (Production): add `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_WEBHOOK_KEY`. **Redeploy.**
+2. Dualhook → new connection. Before the Meta popup, enter:
+   - Webhook URL: `https://lapiz-lead-staging.vercel.app/api/whatsapp?key=<WHATSAPP_WEBHOOK_KEY>`
+   - Verify token: `<WHATSAPP_VERIFY_TOKEN>`
+   Meta's handshake (GET) should pass straight away.
+3. Meta Embedded Signup: log in as the portfolio admin, pick Lapiz Blue's Business Portfolio, choose the number already on the WhatsApp Business app, approve on the staff phone. **Decline chat-history sharing.**
+4. Dualhook shows the connection active and webhook deliveries green. Send a test message (see §9 step 8).
+5. Ask Dualhook support whether a signing secret for `x-hub-signature-256` is available. If yes, add it as `WHATSAPP_APP_SECRET` in Vercel and redeploy.
+
+Keep-alive: Meta drops coexistence if the WhatsApp Business app on the phone isn't opened for ~14 days. Dualhook reminds at day 13. If it drops, reconnect from step 2.
+
+Disconnect / rollback: Dualhook → disconnect, or on the phone WhatsApp Business → Settings → Business tools → Business Platform. The phone keeps working; the app simply receives nothing. Removing `WHATSAPP_WEBHOOK_KEY` from Vercel makes the route reject everything.
+
 ## 7. Deploy and environment
 
 - Vercel project is linked to the GitHub repo; every push to `main` deploys. Preview deploys for other branches.
@@ -101,6 +120,8 @@ Refresh tokens don't expire on their own. A reconnect is needed if the token was
 | Push: CRM rejected the lead (field name in brackets) | That field's value isn't a valid picklist option in the Leads layout; fix in CRM or in the draft |
 | Documents "not added" | File > 20 MB, or Storage bucket `lead-docs` missing (run `schema.sql`) |
 | Counter form: "Pick a category from the list" | CRM categories changed; the form reloads them on next PIN entry |
+| WhatsApp messages not arriving | Dualhook → delivery monitor (are posts leaving Meta?); Vercel → Logs filter `/api/whatsapp` (401 = `?key` in the registered URL doesn't match `WHATSAPP_WEBHOOK_KEY`, or `WHATSAPP_APP_SECRET` is set to the wrong secret); phone not opened for 14 days = coexistence dropped, reconnect |
+| WhatsApp: a staff reply or old chat became a lead | Should be impossible (`field !== 'messages'` skipped); report with the Vercel log line |
 
 ## 9. Testing before a release
 
@@ -111,10 +132,11 @@ Minimum manual pass on the preview or live URL:
 4. Drop a small PDF on a draft, it appears with a link; remove it.
 5. Push one obviously fake test lead, "Open in CRM" works, then delete it in Zoho CRM and remove from the Sent list.
 6. `/counter` with the PIN: save a lead, it appears in Drafts with source Counter.
+7. WhatsApp (once connected): Mayur sends `/lead TEST …` → Mayur draft; a message with a keyword from another phone → WhatsApp draft; `hello` → Filtered out; a staff reply from the phone → nothing. Delete the test drafts.
 
 ## 10. Roadmap (as of October 2026)
 
-1. **WhatsApp go-live** — pick the provider (research in progress), connect it, set `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` (or the provider's equivalent), test Mayur `/lead` flow and customer keyword flow on a branch first.
+1. **WhatsApp go-live** — Dualhook coexistence trial (see §6b). Decide by day 12 of the trial whether to keep paying $12/month; fallback is a free second SIM on Meta's Cloud API for Mayur only.
 2. Lockout on the counter PIN (same pattern as login).
 3. Scheduled fetch (Vercel Cron) so email leads arrive without pressing the button.
 4. Rewrite `SETUP.md` fully once WhatsApp is live.

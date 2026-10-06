@@ -1,9 +1,9 @@
-import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSetting } from '@/lib/db';
 import { classifyWhatsApp } from '@/lib/text';
 import { db } from '@/lib/db';
 import { insertDraft } from '@/lib/drafts';
+import { webhookAuthorized, messageText } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,17 +16,15 @@ export async function GET(req) {
   return new Response('Forbidden', { status: 403 });
 }
 
-// Meta calls this for every incoming message.
+// Meta calls this for every incoming message. Signature or URL key must match (see lib/whatsapp.js).
 export async function POST(req) {
   const raw = await req.text();
-  const secret = process.env.WHATSAPP_APP_SECRET;
-  if (secret) {
-    const sig = req.headers.get('x-hub-signature-256') || '';
-    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(raw).digest('hex');
-    if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-      return new Response('Bad signature', { status: 401 });
-    }
-  }
+  const ok = webhookAuthorized({
+    rawBody: raw,
+    signature: req.headers.get('x-hub-signature-256') || '',
+    key: new URL(req.url).searchParams.get('key') || '',
+  });
+  if (!ok) return new Response('Not allowed', { status: 401 });
   let body;
   try { body = JSON.parse(raw); } catch { return NextResponse.json({ ok: true }); }
 
@@ -35,16 +33,13 @@ export async function POST(req) {
 
   for (const entry of body.entry || []) {
     for (const change of entry.changes || []) {
+      // Coexistence also sends the staff's own replies (smb_message_echoes), old chats
+      // (history) and contacts (smb_app_state_sync). Only real incoming messages count.
+      if (change.field !== 'messages') continue;
       const v = change.value || {};
       const names = Object.fromEntries((v.contacts || []).map((c) => [c.wa_id, c.profile && c.profile.name]));
       for (const m of v.messages || []) {
-        const text =
-          (m.text && m.text.body) ||
-          (m.image && m.image.caption) ||
-          (m.document && (m.document.caption || m.document.filename)) ||
-          (m.button && m.button.text) ||
-          (m.interactive && JSON.stringify(m.interactive)) ||
-          `[${m.type} message]`;
+        const text = messageText(m);
         const { source, status, text: body } = classifyWhatsApp(m.from, text, { mayurNumbers, keywords });
         try {
           if (status === 'followup') {

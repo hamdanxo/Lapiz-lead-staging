@@ -25,8 +25,10 @@ Only Tarun and Hamdan log into the main app. One shared 6-digit code (`APP_PIN`)
 |---|---|---|
 | **Email** | **Fetch leads** reads the newest 30 emails in Tarun's Zoho Mail "Leads" folder. Body becomes the raw text, attachments are copied in, a TRN is read out of PDFs (trade licence / VAT certificate). | Live |
 | **Counter** | Staff fill the form at `/counter` after entering `COUNTER_PIN`. Company, category and "potential" are required; phone must be a UAE number; TRN must be 15 digits. | Live |
-| **Mayur** | WhatsApp message from one of Mayur's numbers (Settings → Mayur's numbers) that contains `/lead` (also `#lead`). Anything else he sends in the next 10 minutes is appended to that lead. His normal chat is never stored. | Code ready, waiting on WhatsApp connection |
-| **WhatsApp** | Message from anyone else. Becomes a draft only if it contains a keyword from Settings (need, bags, mapei…). Otherwise it goes to **Filtered out**, where it can be moved to Drafts by hand. | Code ready, waiting on WhatsApp connection |
+| **Mayur** | WhatsApp message to the company number from one of Mayur's numbers (Settings → Mayur's numbers) that contains `/lead` (also `#lead`). Anything else he sends in the next 10 minutes is appended to that lead. His normal chat is never stored. | Going live Oct 2026 via Meta coexistence (Dualhook trial) |
+| **WhatsApp** | Message to the company number from anyone else. Becomes a draft only if it contains a keyword from Settings (need, bags, mapei…). Otherwise it goes to **Filtered out**, where it can be moved to Drafts by hand. Replies the staff send from the phone are ignored. | Going live Oct 2026 via Meta coexistence (Dualhook trial) |
+
+The company WhatsApp number stays on the staff phone (WhatsApp Business app) and keeps working as before; Meta simply also sends a copy of every incoming message to the app. Expect ordinary customer chatter to pile up in **Filtered out**; that is by design, and an "ignore these numbers" setting is a possible follow-up if it gets noisy.
 
 The source can be changed on a draft (e.g. an email that was really from Mayur).
 

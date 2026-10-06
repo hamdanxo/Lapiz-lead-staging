@@ -12,7 +12,7 @@
 | Email | Zoho Mail API | Reads Tarun's "Leads" and "Sent" folders |
 | AI | Groq, `llama-3.3-70b-versatile`, JSON mode | Free tier. Only fills blanks. |
 | PDF text | `unpdf` | Used for TRN detection and AI input |
-| WhatsApp | Meta Cloud API webhook format | Route exists; connection not live yet |
+| WhatsApp | Meta Cloud API webhooks, delivered via Meta "coexistence" on the company number (partner: Dualhook, $12/mo) | Staff phone keeps the WhatsApp Business app; Meta posts straight to our URL |
 
 ## Folder map
 
@@ -45,6 +45,7 @@ lib/
   groq.js      parseLead(): prompt + JSON parse + picklist validation
   drafts.js    insertDraft (round robin + dedupe on external_id), fetchEmail, enrichPending (AI), flagDuplicates, salesmanNames, runFetch
   docs.js      storage paths, extractText (PDF/txt), storeDoc, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, docsWithLinks
+  whatsapp.js  webhookAuthorized() (signature or URL key, fail closed), messageText(). Unit-tested.
   supabase-browser.js  anon client, used only for uploadToSignedUrl
 middleware.js  redirects to /login unless the cookie is valid; /login, /counter, /api/* and images are public
 supabase/schema.sql    full schema, idempotent, run in Supabase SQL Editor
@@ -99,7 +100,9 @@ For each id: atomically `update status='pushed' where status='draft'` (claims th
 - Listing: `GET /api/drafts` returns docs with 1-hour signed URLs in the same response as the drafts.
 
 ### WhatsApp (`/api/whatsapp`, Meta Cloud API format)
-`GET` answers Meta's verification (`hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`). `POST` verifies `x-hub-signature-256` with `WHATSAPP_APP_SECRET` **if set**, then for each message: `classifyWhatsApp(sender, text)` → Mayur+`/lead` = draft (source Mayur); Mayur without tag = append to his draft from the last 10 min, else drop; others = draft if keyword, else filtered. `external_id = wa:<message id>`. Always returns 200 fast so Meta doesn't retry.
+`GET` answers Meta's verification (`hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`). `POST` must pass `webhookAuthorized()` (`lib/whatsapp.js`): if `WHATSAPP_APP_SECRET` is set, `x-hub-signature-256` must match; otherwise the `?key=` in the URL must equal `WHATSAPP_WEBHOOK_KEY`; with neither set every post is rejected (401). Only `changes[].field === 'messages'` is processed; coexistence extras (`smb_message_echoes` = staff replies from the phone, `history`, `smb_app_state_sync`) are skipped. For each message: `messageText(m)` → `classifyWhatsApp(sender, text)` → Mayur+`/lead` = draft (source Mayur); Mayur without tag = append to his draft from the last 10 min, else drop; others = draft if keyword, else filtered. `external_id = wa:<message id>` makes Meta's retries harmless. Always returns 200 fast so Meta doesn't retry.
+
+Why the URL key: Meta signs webhooks with the secret of the app that holds the subscription. Through a coexistence partner that is the partner's app, so the signature usually can't be checked by us; the registered URL (query string included) is the shared secret instead.
 
 ### Counter (`/counter`)
 `GET /api/counter?pin=` returns salesmen and categories after `COUNTER_PIN` check. `POST` validates (UAE phone, 15-digit TRN, category must exist in CRM) and inserts a Counter draft with round-robin salesman if none picked.
@@ -126,7 +129,9 @@ For each id: atomically `update status='pushed' where status='draft'` (claims th
 | `GROQ_API_KEY`, `GROQ_MODEL` | AI pre-fill (model defaults to `llama-3.3-70b-versatile`) |
 | `ZOHO_ACCOUNTS_URL`, `ZOHO_API_URL`, `ZOHO_MAIL_URL` | default to the .com data centre |
 | `ZOHO_LEAD_LAYOUT_ID` | Leads layout whose picklists the app uses |
-| `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` | Meta webhook (not set until WhatsApp goes live) |
+| `WHATSAPP_VERIFY_TOKEN` | Any long random string; Meta's GET handshake must present it |
+| `WHATSAPP_WEBHOOK_KEY` | Long random string that must appear as `?key=` in the webhook URL registered with Meta/Dualhook |
+| `WHATSAPP_APP_SECRET` | Optional. Only if a signing secret for `x-hub-signature-256` is available; then it takes precedence over the key |
 
 Zoho client ids/secrets and refresh tokens are **not** env vars; they are stored in the `settings` table by the Connect flow.
 
@@ -135,7 +140,8 @@ Zoho client ids/secrets and refresh tokens are **not** env vars; they are stored
 - Everything data-related runs server-side with the service-role key; the browser never talks to the tables.
 - Pages are gated by middleware; APIs by `requireUser()`. Public: `/login`, `/counter`, `/api/login`, `/api/counter`, `/api/whatsapp`, images.
 - PIN compares are timing-safe with a 1.5 s delay on failure; the main login also locks per IP after 10 failures.
-- Known gaps: counter PIN has no lockout; WhatsApp webhook accepts unsigned requests while `WHATSAPP_APP_SECRET` is unset; one shared login (no per-person audit).
+- WhatsApp webhook fails closed: no secret/key configured means nothing is accepted.
+- Known gaps: counter PIN has no lockout; one shared login (no per-person audit).
 
 ## Limits and timeouts
 

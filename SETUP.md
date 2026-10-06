@@ -77,6 +77,6 @@ In **Settings**: tick the salesmen for round robin, check the keyword list and M
 
 Counter staff use: `your-link.vercel.app/counter` with the PIN. They can only add leads, not see them.
 
-## WhatsApp (not live yet)
+## WhatsApp
 
-The webhook at `/api/whatsapp` expects Meta WhatsApp Cloud API payloads. When the provider is chosen, add `WHATSAPP_VERIFY_TOKEN` (any word you choose, same one typed in Meta) and `WHATSAPP_APP_SECRET` (from the Meta app settings) to Vercel and redeploy. See `docs/WORKFLOW.md` → Roadmap.
+The webhook at `/api/whatsapp` receives Meta WhatsApp Cloud API posts. The company number stays on the staff phone; Meta "coexistence" (set up through Dualhook) sends a copy of every incoming message to the app. Full procedure: `docs/WORKFLOW.md` §6b. In short: add `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_WEBHOOK_KEY` (long random strings) to Vercel, redeploy, then register `https://<your-link>/api/whatsapp?key=<WHATSAPP_WEBHOOK_KEY>` with that verify token in Dualhook and complete Meta's signup on the staff phone.
