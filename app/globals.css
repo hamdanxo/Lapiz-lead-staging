@@ -187,3 +187,10 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--sky); }
   .btn { padding: 8px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Stop Chrome autofill from painting fields white */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink); caret-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px #07122a inset; box-shadow: 0 0 0 1000px #07122a inset;
+  transition: background-color 9999s ease-out 0s; border-color: var(--edge);
+}

@@ -25,6 +25,19 @@ export async function GET(req) {
 export async function PATCH(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;
   const body = await req.json();
+
+  // { ids: [...], action: 'remove_sent' } clears leads from the "Sent to CRM" list.
+  // Only the app's copy is hidden; the lead in Zoho CRM is not touched.
+  if (body.action === 'remove_sent') {
+    const ids = (body.ids || []).filter(Boolean).slice(0, 500);
+    if (!ids.length) return json({ removed: 0 });
+    const { data, error } = await db().from('drafts')
+      .update({ status: 'deleted', updated_at: new Date().toISOString() })
+      .in('id', ids).eq('status', 'pushed').select('id');
+    if (error) return json({ error: error.message }, 500);
+    return json({ removed: (data || []).length });
+  }
+
   const { data: cur } = await db().from('drafts').select('status').eq('id', body.id).maybeSingle();
   if (!cur) return json({ error: 'Draft not found' }, 404);
   if (cur.status === 'pushed') return json({ error: 'Already sent to CRM, edit it in Zoho instead' }, 409);

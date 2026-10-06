@@ -118,6 +118,19 @@ export default function Home() {
     setBusy('');
   }
 
+  async function removeSent(ids) {
+    if (!ids.length) return;
+    if (!confirm(`Remove ${ids.length} lead${ids.length > 1 ? 's' : ''} from this list? They stay in Zoho CRM.`)) return;
+    const before = drafts;
+    setDrafts((ds) => ds.filter((d) => !ids.includes(d.id)));
+    setSelected(new Set());
+    try {
+      const r = await api('/api/drafts', { method: 'PATCH', body: JSON.stringify({ action: 'remove_sent', ids }) });
+      setNotice({ bad: false, text: `${r.removed} removed from the list. They are still in Zoho CRM.` });
+      load().catch(() => {});
+    } catch (e) { setDrafts(before); setNotice({ bad: true, text: e.message }); }
+  }
+
   async function signOut() {
     await fetch('/api/logout', { method: 'POST' }).catch(() => {});
     window.location.href = '/login';
@@ -168,6 +181,20 @@ export default function Home() {
         </div>
       )}
 
+      {tab === 'pushed' && drafts.length > 0 && (
+        <div className="bulk">
+          <label className="check">
+            <input type="checkbox"
+              checked={drafts.length > 0 && drafts.every((d) => selected.has(d.id))}
+              onChange={(e) => setSelected(e.target.checked ? new Set(drafts.map((d) => d.id)) : new Set())} />
+            Select all ({drafts.length})
+          </label>
+          <button className="btn danger" disabled={!selected.size} onClick={() => removeSent([...selected])}>
+            {`Remove ${selected.size || ''} from list`}
+          </button>
+        </div>
+      )}
+
       <section className="list">
         {drafts.length === 0 && <div className="empty">{tab === 'draft' ? 'No drafts waiting. Press Fetch leads to check for new ones.' : 'Nothing here.'}</div>}
         {drafts.map((d) =>
@@ -185,8 +212,9 @@ export default function Home() {
               <div className="row-end"><button className="btn" onClick={() => setStatus(d.id, 'restore')}>Move to Drafts</button></div>
             </div>
           ) : (
-            <div className="card sent" key={d.id}>
+            <div className={`card sent ${selected.has(d.id) ? 'picked' : ''}`} key={d.id}>
               <div className="card-head">
+                <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)} title="Select" />
                 <span className={`pill ${d.source}`}>{d.source}</span>
                 <strong>{d.company}</strong>
                 <span className="muted">→ {d.salesman_name || 'salesman'} · {when(d.pushed_at)} by {d.pushed_by}</span>
