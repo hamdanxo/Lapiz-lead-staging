@@ -8,6 +8,7 @@
 4. **Push to CRM** per lead, or tick several ready ones and push together.
 5. **Filtered out** tab: skim WhatsApp messages that had no keyword; **Move to Drafts** if one was real.
 6. **Sent to CRM** tab: "Open in CRM" to verify; remove from the list when done.
+7. **Reports** tab: how many leads reached the CRM this week/month, by salesman, brand and source. Export CSV for Excel.
 
 If something says "Zoho CRM is not connected" or a token error appears, see §6.
 
@@ -134,7 +135,8 @@ Minimum manual pass on the preview or live URL:
 5. Push one obviously fake test lead, "Open in CRM" works, then delete it in Zoho CRM and remove from the Sent list.
 6. `/counter` with the PIN: save a lead, it appears in Drafts with source Counter.
 7. Recall round-trip: push a fake test lead, **Recall to Drafts** → it is back in Drafts with no CRM link and the lead sits in Zoho's Recycle Bin; push again → new CRM lead with the documents re-attached. Then Delete it in the app.
-8. WhatsApp (once connected): Mayur sends `/lead TEST …` → Mayur draft; a message with a keyword from another phone → WhatsApp draft; `hello` → Filtered out; a staff reply from the phone → nothing. Delete the test drafts.
+8. Reports: pick This month, then All time; the total and the by-month table change. Click a salesman row, the filter is applied and the lead list shrinks. Export CSV opens in Excel with the same number of rows as the total.
+9. WhatsApp (once connected): Mayur sends `/lead TEST …` → Mayur draft; a message with a keyword from another phone → WhatsApp draft; `hello` → Filtered out; a staff reply from the phone → nothing. Delete the test drafts.
 
 ## 10. Roadmap (as of October 2026)
 

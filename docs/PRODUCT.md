@@ -54,6 +54,20 @@ Push creates a Zoho CRM Lead with: Company, Last Name (contact or company), Lead
 - **Drafts**: waiting for review. Select all ready → push together.
 - **Filtered out**: WhatsApp messages without a keyword, or anything parked there by hand. "Move to Drafts" if one was real.
 - **Sent to CRM**: everything pushed, with "Open in CRM". Can be recalled (see below) or removed from the list (the CRM lead is untouched).
+- **Reports**: how many leads actually reached the CRM, by period, salesman, brand and source. Read-only.
+
+All three lead lists have a **Newest first / Oldest first** toggle above them. Drafts and Filtered out sort by the date the lead came in; Sent to CRM sorts by the date it was sent.
+
+## Reports
+
+Counts **only leads that were pushed to Zoho CRM**, by the date the lead came in (not the date it was pushed; the date sent is shown as a column so both are visible). Leads sitting in Drafts, parked in Filtered out, or removed from the list are not counted.
+
+- **Period**: This week (weeks start Monday), This month, Last month, a chosen month, a chosen year, All time, or custom from/to dates (both days included).
+- **Dubai time.** A lead that arrives at 00:30 Dubai on 1 October counts in October, even though in UTC it is still 30 September. The dates on screen are Dubai dates too.
+- **Filters**: salesman, brand and source, in any combination. Clicking a row in the by-salesman or by-brand table applies it as a filter; clicking the same row again removes it.
+- **What it shows**: one total, a table by salesman (count and share %), a table by brand, a table by month with empty months left in so a quiet month is visible, and the matching leads underneath (date in, date sent, company, salesman, brands, source), newest first. The table shows the newest 200; **Export CSV** gives every lead in the filtered period.
+- One lead can carry several brands, so the brand counts add up to more than the total. The screen says so.
+- A lead whose salesman or brand is missing is grouped as "No salesman" / "No brand" and cannot be clicked as a filter.
 
 ## Moving leads between tabs
 

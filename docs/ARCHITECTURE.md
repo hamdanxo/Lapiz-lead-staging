@@ -20,14 +20,15 @@
 app/
   layout.js            fonts (Cormorant Garamond + Nunito Sans), backdrop, grain
   globals.css          all styling; dark theme, classes: card, pill, chip, alert, drawer…
-  page.js              the main app (client component): tabs, DraftCard, Docs, Settings, ConnectBox
+  page.js              the main app (client component): tabs, DraftCard, Docs, Reports, CountTable, Settings, ConnectBox
   login/page.js        6-digit code form → POST /api/login
   counter/page.js      PIN gate + walk-in lead form (client-side validation mirrors the API)
   api/
     login/route.js     check APP_PIN, set signed cookie; 10 wrong tries per IP = 15 min lock (stored in settings)
     logout/route.js    clear cookie
     meta/route.js      salesmen + picklists (15 min cache) + which Zoho connections exist
-    drafts/route.js    GET list by status (+counts +docs); PATCH edit fields / delete / move (incl. recall) / remove_sent
+    drafts/route.js    GET list by status (+counts +docs, ?sort=new|old); PATCH edit fields / delete / move (incl. recall) / remove_sent
+    reports/route.js   GET counts of pushed leads by period/salesman/brand/source, or ?format=csv
     fetch/route.js     POST → lib/drafts.runFetch()
     push/route.js      POST {ids} → create CRM leads + attach docs
     docs/route.js      GET links; POST upload-url / register / sync; DELETE file
@@ -46,6 +47,7 @@ lib/
   drafts.js    insertDraft (round robin + dedupe on external_id), moveDraft (tab moves + CRM recall), fetchEmail, enrichPending (AI), flagDuplicates, salesmanNames, runFetch
   docs.js      storage paths, extractText (PDF/txt), storeDoc, registerUpload, saveEmailDocs, trnFromDocs, pushDocsToCrm, docsWithLinks
   whatsapp.js  webhookAuthorized() (signature or URL key, fail closed), messageText(). Unit-tested.
+  reports.js   pure period maths in Dubai time (periodRange, monthsInRange, monthKey), summarise(), toCsv(). Unit-tested.
   supabase-browser.js  anon client, used only for uploadToSignedUrl
 middleware.js  redirects to /login unless the cookie is valid; /login, /counter, /api/* and images are public
 supabase/schema.sql    full schema, idempotent, run in Supabase SQL Editor
@@ -102,6 +104,13 @@ For each id: atomically `update status='pushed' where status='draft'` (claims th
 - Upload: browser asks `POST /api/docs {action:'upload-url'}` → signed upload URL → browser uploads directly to Storage → `POST {action:'register'}` → server downloads it, extracts text, inserts `draft_docs`, runs `trnFromDocs`; if the draft is already pushed, sends the file to CRM immediately.
 - Listing: `GET /api/drafts` returns docs with 1-hour signed URLs in the same response as the drafts.
 
+### Reports (`GET /api/reports`)
+Counts only leads with `status = 'pushed'`, by `created_at` (the day the lead came in). Query: `period` ∈ week | month | last_month | pick_month | pick_year | all | custom, plus `month=YYYY-MM`, `year=YYYY`, `from`/`to` (`YYYY-MM-DD`, the `to` day is included), and the filters `salesman` (`salesman_name`), `brand` (a value in the `products` array), `source`. Filters combine (AND).
+
+`periodRange()` (`lib/reports.js`, pure, tested) turns the picker into a half-open range `[from, to)` of ISO instants. **All grouping is Dubai time**: the UAE is UTC+4 all year with no daylight saving, so the code shifts by exactly four hours instead of using a timezone library. Weeks start Monday. A bad date returns 400 with a plain sentence.
+
+The route reads the matching leads in pages of 1000 (narrow columns only, `drafts_status_idx` covers it) and counts them in `summarise()`: one total, by salesman (count + share %), by brand (a lead with three brands counts in all three, so brand counts can exceed the total), and by month with empty months filled in so a gap is visible. It returns the newest 200 leads for the table on screen; `?format=csv` returns every matching lead as CSV (UTF-8 BOM for Excel, dates as `YYYY-MM-DD` Dubai). Nothing is counted in the browser.
+
 ### WhatsApp (`/api/whatsapp`, Meta Cloud API format)
 `GET` answers Meta's verification (`hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`). `POST` must pass `webhookAuthorized()` (`lib/whatsapp.js`): if `WHATSAPP_APP_SECRET` is set, `x-hub-signature-256` must match; otherwise the `?key=` in the URL must equal `WHATSAPP_WEBHOOK_KEY`; with neither set every post is rejected (401). Only `changes[].field === 'messages'` is processed; coexistence extras (`smb_message_echoes` = staff replies from the phone, `history`, `smb_app_state_sync`) are skipped. For each message: `messageText(m)` → `classifyWhatsApp(sender, text)` → Mayur+`/lead` = draft (source Mayur); Mayur without tag = append to his draft from the last 10 min, else drop; others = draft if keyword, else filtered. `external_id = wa:<message id>` makes Meta's retries harmless. Always returns 200 fast so Meta doesn't retry.
 
@@ -148,6 +157,7 @@ Zoho client ids/secrets and refresh tokens are **not** env vars; they are stored
 
 ## Limits and timeouts
 
-- `/api/fetch`, `/api/push`, `/api/docs` set `maxDuration = 60` (Vercel function limit).
+- `/api/fetch`, `/api/push`, `/api/docs` set `maxDuration = 60` (Vercel function limit); `/api/reports` sets 30.
+- Reports read at most 25 000 pushed leads per request (25 pages of 1000) and show the newest 200 in the table; the CSV has them all.
 - Fetch reads 30 newest emails and 200 sent emails; AI handles 15 drafts per run.
 - Files: 20 MB each (CRM limit). Text extraction capped at 20 000 chars; AI sees 3 000 chars of message + 3 000 of documents.

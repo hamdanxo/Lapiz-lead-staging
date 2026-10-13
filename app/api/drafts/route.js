@@ -9,11 +9,13 @@ const EDITABLE = ['company', 'contact_name', 'phone', 'email', 'approx_qty', 'tr
 
 export async function GET(req) {
   const auth = await requireUser(); if (auth.error) return auth.error;
-  const status = new URL(req.url).searchParams.get('status') || 'draft';
+  const params = new URL(req.url).searchParams;
+  const status = params.get('status') || 'draft';
+  const oldestFirst = params.get('sort') === 'old'; // the sort toggle above the list
   const count = (s) => db().from('drafts').select('id', { count: 'exact', head: true }).eq('status', s);
   const [list, c1, c2, c3] = await Promise.all([
     db().from('drafts').select('*').eq('status', status)
-      .order(status === 'pushed' ? 'pushed_at' : 'created_at', { ascending: false }).limit(200),
+      .order(status === 'pushed' ? 'pushed_at' : 'created_at', { ascending: oldestFirst }).limit(200),
     count('draft'), count('filtered'), count('pushed'),
   ]);
   if (list.error) return json({ error: list.error.message }, 500);

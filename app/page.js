@@ -7,6 +7,17 @@ const TABS = [
   { key: 'draft', label: 'Drafts' },
   { key: 'filtered', label: 'Filtered out' },
   { key: 'pushed', label: 'Sent to CRM' },
+  { key: 'reports', label: 'Reports' },
+];
+const SOURCES = ['Mayur', 'WhatsApp', 'Email', 'Counter'];
+const PERIODS = [
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+  { key: 'last_month', label: 'Last month' },
+  { key: 'pick_month', label: 'Pick a month' },
+  { key: 'pick_year', label: 'Pick a year' },
+  { key: 'all', label: 'All time' },
+  { key: 'custom', label: 'Custom dates' },
 ];
 
 function missing(d) {
@@ -21,6 +32,17 @@ function missing(d) {
 function when(ts) {
   if (!ts) return '';
   return new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// Reports are counted in Dubai time, so the dates on screen are shown in Dubai time too.
+function dubaiDay(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Today in Dubai as 2026-10-13, which is what the month and date boxes expect.
+function dubaiToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
 }
 
 async function api(path, opts = {}) {
@@ -41,6 +63,7 @@ export default function Home() {
   const [notice, setNotice] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [docsBy, setDocsBy] = useState({});
+  const [sort, setSort] = useState('new'); // newest or oldest first in the three lead lists
 
   const groupDocs = (docs) => {
     const by = {};
@@ -48,13 +71,14 @@ export default function Home() {
     return by;
   };
 
-  // Leads, counts and their files come back in one request.
+  // Leads, counts and their files come back in one request. Reports has its own route.
   const load = useCallback(async (t = tab) => {
-    const j = await api(`/api/drafts?status=${t}`);
+    if (t === 'reports') return;
+    const j = await api(`/api/drafts?status=${t}&sort=${sort}`);
     setDrafts(j.drafts || []);
     setCounts(j.counts || {});
     setDocsBy(groupDocs(j.docs));
-  }, [tab]);
+  }, [tab, sort]);
 
   const loadMeta = useCallback(async (fresh = false) => {
     try { setMeta(await api(`/api/meta${fresh ? '?fresh=1' : ''}`)); } catch (e) { setNotice({ bad: true, text: e.message }); }
@@ -190,73 +214,88 @@ export default function Home() {
         ))}
       </nav>
 
-      {tab === 'draft' && drafts.length > 0 && (
-        <div className="bulk">
-          <label className="check">
-            <input type="checkbox"
-              checked={ready.length > 0 && ready.every((d) => selected.has(d.id))}
-              onChange={(e) => setSelected(e.target.checked ? new Set(ready.map((d) => d.id)) : new Set())} />
-            Select all ready ({ready.length})
-          </label>
-          <button className="btn primary" disabled={!selected.size || !!busy} onClick={() => push([...selected])}>
-            {busy === 'push' ? 'Sending…' : `Push ${selected.size || ''} to CRM`}
-          </button>
-        </div>
-      )}
-
-      {tab === 'pushed' && drafts.length > 0 && (
-        <div className="bulk">
-          <label className="check">
-            <input type="checkbox"
-              checked={drafts.length > 0 && drafts.every((d) => selected.has(d.id))}
-              onChange={(e) => setSelected(e.target.checked ? new Set(drafts.map((d) => d.id)) : new Set())} />
-            Select all ({drafts.length})
-          </label>
-          <button className="btn primary" disabled={!selected.size} onClick={() => move([...selected], 'draft', recallText(selected.size))}>
-            {`Recall ${selected.size || ''} to Drafts`}
-          </button>
-          <button className="btn danger" disabled={!selected.size} onClick={() => removeSent([...selected])}>
-            {`Remove ${selected.size || ''} from list`}
-          </button>
-        </div>
-      )}
-
-      <section className="list">
-        {drafts.length === 0 && <div className="empty">{tab === 'draft' ? 'No drafts waiting. Press Fetch leads to check for new ones.' : 'Nothing here.'}</div>}
-        {drafts.map((d) =>
-          tab === 'draft' ? (
-            <DraftCard key={d.id} d={d} meta={meta} salesmen={salesmen}
-              selected={selected.has(d.id)} onToggle={() => toggle(d.id)}
-              onLocal={(f) => patchLocal(d.id, f)} onSave={(f) => save(d.id, f)}
-              onDelete={() => confirm('Delete this draft? It will not go to CRM.') && setStatus(d.id, 'delete')}
-              onFilter={() => move([d.id], 'filtered')}
-              onPush={() => push([d.id])} busy={!!busy}
-              docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} />
-          ) : tab === 'filtered' ? (
-            <div className="card" key={d.id}>
-              <div className="card-head"><span className={`pill ${d.source}`}>{d.source}</span><span className="muted">{d.sender ? `+${d.sender}` : ''} · {when(d.created_at)}</span></div>
-              <pre className="raw">{d.raw_text}</pre>
-              <div className="row-end"><button className="btn" onClick={() => move([d.id], 'draft')}>Move to Drafts</button></div>
+      {tab === 'reports' ? (
+        <Reports meta={meta} onNotice={setNotice} />
+      ) : (
+        <>
+          {drafts.length > 0 && (
+            <div className="listbar">
+              <span className="muted small">{tab === 'pushed' ? 'By the date sent to CRM' : 'By the date the lead came in'}</span>
+              <button className="link" title="Change the order" onClick={() => setSort(sort === 'new' ? 'old' : 'new')}>
+                {sort === 'new' ? 'Newest first' : 'Oldest first'} ⇅
+              </button>
             </div>
-          ) : (
-            <div className={`card sent ${selected.has(d.id) ? 'picked' : ''}`} key={d.id}>
-              <div className="card-head">
-                <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)} title="Select" />
-                <span className={`pill ${d.source}`}>{d.source}</span>
-                <strong>{d.company}</strong>
-                <span className="muted">→ {d.salesman_name || 'salesman'} · {when(d.pushed_at)} by {d.pushed_by}</span>
-                {d.crm_lead_id && <a className="link" href={CRM_LEAD_URL + d.crm_lead_id} target="_blank" rel="noreferrer">Open in CRM</a>}
-              </div>
-              {d.push_error && <div className="alert warn small">{d.push_error}</div>}
-              <Docs d={d} docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} sent />
-              <div className="row-end">
-                <button className="btn ghost" onClick={() => move([d.id], 'filtered', recallText(1, d.company))}>Recall to Filtered out</button>
-                <button className="btn" onClick={() => move([d.id], 'draft', recallText(1, d.company))}>Recall to Drafts</button>
-              </div>
+          )}
+
+          {tab === 'draft' && drafts.length > 0 && (
+            <div className="bulk">
+              <label className="check">
+                <input type="checkbox"
+                  checked={ready.length > 0 && ready.every((d) => selected.has(d.id))}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(ready.map((d) => d.id)) : new Set())} />
+                Select all ready ({ready.length})
+              </label>
+              <button className="btn primary" disabled={!selected.size || !!busy} onClick={() => push([...selected])}>
+                {busy === 'push' ? 'Sending…' : `Push ${selected.size || ''} to CRM`}
+              </button>
             </div>
-          )
-        )}
-      </section>
+          )}
+
+          {tab === 'pushed' && drafts.length > 0 && (
+            <div className="bulk">
+              <label className="check">
+                <input type="checkbox"
+                  checked={drafts.length > 0 && drafts.every((d) => selected.has(d.id))}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(drafts.map((d) => d.id)) : new Set())} />
+                Select all ({drafts.length})
+              </label>
+              <button className="btn primary" disabled={!selected.size} onClick={() => move([...selected], 'draft', recallText(selected.size))}>
+                {`Recall ${selected.size || ''} to Drafts`}
+              </button>
+              <button className="btn danger" disabled={!selected.size} onClick={() => removeSent([...selected])}>
+                {`Remove ${selected.size || ''} from list`}
+              </button>
+            </div>
+          )}
+
+          <section className="list">
+            {drafts.length === 0 && <div className="empty">{tab === 'draft' ? 'No drafts waiting. Press Fetch leads to check for new ones.' : 'Nothing here.'}</div>}
+            {drafts.map((d) =>
+              tab === 'draft' ? (
+                <DraftCard key={d.id} d={d} meta={meta} salesmen={salesmen}
+                  selected={selected.has(d.id)} onToggle={() => toggle(d.id)}
+                  onLocal={(f) => patchLocal(d.id, f)} onSave={(f) => save(d.id, f)}
+                  onDelete={() => confirm('Delete this draft? It will not go to CRM.') && setStatus(d.id, 'delete')}
+                  onFilter={() => move([d.id], 'filtered')}
+                  onPush={() => push([d.id])} busy={!!busy}
+                  docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} />
+              ) : tab === 'filtered' ? (
+                <div className="card" key={d.id}>
+                  <div className="card-head"><span className={`pill ${d.source}`}>{d.source}</span><span className="muted">{d.sender ? `+${d.sender}` : ''} · {when(d.created_at)}</span></div>
+                  <pre className="raw">{d.raw_text}</pre>
+                  <div className="row-end"><button className="btn" onClick={() => move([d.id], 'draft')}>Move to Drafts</button></div>
+                </div>
+              ) : (
+                <div className={`card sent ${selected.has(d.id) ? 'picked' : ''}`} key={d.id}>
+                  <div className="card-head">
+                    <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)} title="Select" />
+                    <span className={`pill ${d.source}`}>{d.source}</span>
+                    <strong>{d.company}</strong>
+                    <span className="muted">→ {d.salesman_name || 'salesman'} · {when(d.pushed_at)} by {d.pushed_by}</span>
+                    {d.crm_lead_id && <a className="link" href={CRM_LEAD_URL + d.crm_lead_id} target="_blank" rel="noreferrer">Open in CRM</a>}
+                  </div>
+                  {d.push_error && <div className="alert warn small">{d.push_error}</div>}
+                  <Docs d={d} docs={docsBy[d.id] || []} onDocs={() => load()} onNotice={setNotice} sent />
+                  <div className="row-end">
+                    <button className="btn ghost" onClick={() => move([d.id], 'filtered', recallText(1, d.company))}>Recall to Filtered out</button>
+                    <button className="btn" onClick={() => move([d.id], 'draft', recallText(1, d.company))}>Recall to Drafts</button>
+                  </div>
+                </div>
+              )
+            )}
+          </section>
+        </>
+      )}
 
       {showSettings && <Settings meta={meta} salesmen={salesmen} onClose={() => { setShowSettings(false); loadMeta(true); }} />}
     </div>
@@ -528,6 +567,237 @@ function ConnectBox({ kind, title, connected, help, scopes }) {
           {msg && <div className={`alert ${msg.bad ? 'bad' : 'good'}`}>{msg.text}</div>}
           <button className="btn primary" disabled={busy}>{busy ? 'Connecting…' : 'Connect'}</button>
         </form>
+      )}
+    </div>
+  );
+}
+
+const pct = (n, max) => (n ? Math.max(2, Math.round((n / max) * 100)) : 0);
+
+// The Reports tab. It only counts leads already sent to CRM, by the day the lead came in.
+// All the counting happens in /api/reports; this picks the period and shows the numbers.
+function Reports({ meta, onNotice }) {
+  const [period, setPeriod] = useState('month');
+  const [month, setMonth] = useState(dubaiToday().slice(0, 7));
+  const [year, setYear] = useState(dubaiToday().slice(0, 4));
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [f, setF] = useState({ salesman: '', brand: '', source: '' });
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [csvBusy, setCsvBusy] = useState(false);
+
+  const query = useMemo(() => {
+    const p = new URLSearchParams({ period });
+    if (period === 'pick_month') p.set('month', month);
+    if (period === 'pick_year') p.set('year', year);
+    if (period === 'custom') { if (from) p.set('from', from); if (to) p.set('to', to); }
+    for (const k of ['salesman', 'brand', 'source']) if (f[k]) p.set(k, f[k]);
+    return p.toString();
+  }, [period, month, year, from, to, f]);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setErr(null);
+    api(`/api/reports?${query}`)
+      .then((j) => { if (alive) { setData(j); setLoading(false); } })
+      .catch((e) => { if (alive) { setErr(e.message); setData(null); setLoading(false); } });
+    return () => { alive = false; }; // a slow answer must not overwrite a newer one
+  }, [query]);
+
+  // The dropdowns list the CRM values plus whatever turns up in the report, so a salesman who
+  // has left, or a brand hidden in the app, can still be picked.
+  const options = useMemo(() => {
+    const union = (a, b) => [...new Set([...(a || []), ...(b || [])])]
+      .filter((x) => x && !x.startsWith('No '))
+      .sort((x, y) => x.localeCompare(y));
+    return {
+      salesmen: union(meta.users.map((u) => u.name), ((data && data.bySalesman) || []).map((r) => r.name)),
+      brands: union(meta.products, ((data && data.byBrand) || []).map((r) => r.name)),
+    };
+  }, [meta, data]);
+
+  const years = useMemo(() => {
+    const thisYear = Number(dubaiToday().slice(0, 4));
+    return Array.from({ length: 6 }, (_, i) => String(thisYear - i));
+  }, []);
+
+  async function exportCsv() {
+    setCsvBusy(true);
+    try {
+      const res = await fetch(`/api/reports?${query}&format=csv`);
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Export failed (${res.status})`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lapiz-leads-${dubaiToday()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { onNotice({ bad: true, text: e.message }); }
+    setCsvBusy(false);
+  }
+
+  const r = data || {};
+  const chosen = [f.salesman, f.brand, f.source].filter(Boolean);
+  const pickFilter = (k, name) => setF((cur) => ({ ...cur, [k]: cur[k] === name ? '' : name }));
+  const maxMonth = Math.max(1, ...(r.byMonth || []).map((m) => m.count));
+
+  return (
+    <section className="report">
+      <div className="card">
+        <div className="chips">
+          {PERIODS.map((p) => (
+            <button type="button" key={p.key} className={`chip ${period === p.key ? 'on' : ''}`} onClick={() => setPeriod(p.key)}>{p.label}</button>
+          ))}
+        </div>
+
+        {period === 'pick_month' && (
+          <div className="rrow">
+            <label>Month<input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label>
+          </div>
+        )}
+        {period === 'pick_year' && (
+          <div className="rrow">
+            <label>Year
+              <select value={year} onChange={(e) => setYear(e.target.value)}>
+                {years.map((y) => <option key={y}>{y}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+        {period === 'custom' && (
+          <div className="rrow">
+            <label>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          </div>
+        )}
+
+        <div className="rrow">
+          <label>Salesman
+            <select value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })}>
+              <option value="">All salesmen</option>
+              {options.salesmen.map((n) => <option key={n}>{n}</option>)}
+            </select>
+          </label>
+          <label>Brand
+            <select value={f.brand} onChange={(e) => setF({ ...f, brand: e.target.value })}>
+              <option value="">All brands</option>
+              {options.brands.map((n) => <option key={n}>{n}</option>)}
+            </select>
+          </label>
+          <label>Source
+            <select value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })}>
+              <option value="">All sources</option>
+              {SOURCES.map((n) => <option key={n}>{n}</option>)}
+            </select>
+          </label>
+          {chosen.length > 0 && <button className="link" onClick={() => setF({ salesman: '', brand: '', source: '' })}>Clear filters</button>}
+        </div>
+      </div>
+
+      {err && <div className="alert bad">{err}</div>}
+
+      <div className="card stat">
+        <span className="n">{loading ? '…' : r.total || 0}</span>
+        <span className="stat-text">
+          <strong>lead{r.total === 1 ? '' : 's'} sent to CRM</strong>
+          <span className="muted small">{(r.range && r.range.label) || ''}{chosen.length ? ` · ${chosen.join(' · ')}` : ''}</span>
+        </span>
+        <button className="btn" disabled={csvBusy || loading || !r.total} onClick={exportCsv}>{csvBusy ? 'Preparing…' : 'Export CSV'}</button>
+      </div>
+
+      <div className="cards2">
+        <CountTable title="By salesman" head="Salesman" note="Click a row to show only that salesman."
+          rows={r.bySalesman} loading={loading} active={f.salesman} onPick={(n) => pickFilter('salesman', n)} />
+        <CountTable title="By brand" head="Brand" note="One lead can have several brands, so these add up to more than the total. Click a row to show only that brand."
+          rows={r.byBrand} loading={loading} active={f.brand} onPick={(n) => pickFilter('brand', n)} />
+      </div>
+
+      <div className="card">
+        <h3 className="rt-title">By month</h3>
+        {loading ? <p className="muted">Counting…</p> : !(r.byMonth || []).length ? <p className="muted">Nothing in this period.</p> : (
+          <div className="rt-wrap">
+            <table className="rt">
+              <thead><tr><th>Month</th><th className="num">Leads</th><th className="bar-col"> </th></tr></thead>
+              <tbody>
+                {r.byMonth.map((m) => (
+                  <tr key={m.key}>
+                    <td className="nowrap">{m.label}</td>
+                    <td className="num">{m.count}</td>
+                    <td className="bar-col"><div className="bar" style={{ width: `${pct(m.count, maxMonth)}%` }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 className="rt-title">The leads</h3>
+        {loading ? <p className="muted">Loading…</p> : !(r.leads || []).length ? <p className="muted">No leads in this period.</p> : (
+          <>
+            <div className="rt-wrap">
+              <table className="rt">
+                <thead>
+                  <tr><th>Date in</th><th>Date sent</th><th>Company</th><th>Salesman</th><th>Brands</th><th>Source</th></tr>
+                </thead>
+                <tbody>
+                  {r.leads.map((d) => (
+                    <tr key={d.id}>
+                      <td className="nowrap">{dubaiDay(d.created_at)}</td>
+                      <td className="nowrap">{dubaiDay(d.pushed_at)}</td>
+                      <td>{d.crm_lead_id
+                        ? <a className="link" href={CRM_LEAD_URL + d.crm_lead_id} target="_blank" rel="noreferrer">{d.company}</a>
+                        : d.company}</td>
+                      <td>{d.salesman_name || '—'}</td>
+                      <td>{(d.products || []).join(', ') || '—'}</td>
+                      <td><span className={`pill ${d.source}`}>{d.source}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {r.total > r.shown && <p className="muted small">Showing the newest {r.shown} of {r.total}. Export CSV for the whole list.</p>}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// One of the two count tables. Clicking a row filters the whole report by that value.
+function CountTable({ title, head, note, rows, loading, active, onPick }) {
+  const list = rows || [];
+  return (
+    <div className="card">
+      <h3 className="rt-title">{title}</h3>
+      {note && <p className="muted small">{note}</p>}
+      {loading ? <p className="muted">Counting…</p> : !list.length ? <p className="muted">Nothing in this period.</p> : (
+        <div className="rt-wrap">
+          <table className="rt">
+            <thead><tr><th>{head}</th><th className="num">Leads</th><th className="num">Share</th></tr></thead>
+            <tbody>
+              {list.map((row) => {
+                const pickable = !row.name.startsWith('No '); // "No salesman" cannot be a filter
+                const on = active === row.name;
+                return (
+                  <tr key={row.name} className={`${pickable ? 'click' : ''} ${on ? 'on' : ''}`}
+                    onClick={pickable ? () => onPick(row.name) : undefined}
+                    title={pickable ? (on ? 'Click to remove this filter' : `Show only ${row.name}`) : ''}>
+                    <td>{row.name}</td>
+                    <td className="num">{row.count}</td>
+                    <td className="num">{row.share}%<div className="bar" style={{ width: `${pct(row.share, 100)}%` }} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

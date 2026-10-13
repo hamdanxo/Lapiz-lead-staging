@@ -173,6 +173,39 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--sky); }
   font: 400 13px var(--sans); letter-spacing: 0; text-transform: none; background: rgba(3, 10, 24, 0.35); transition: all .2s; }
 .drop:hover, .drop.over { border-color: rgba(255, 255, 255, 0.7); background: var(--sky-soft); color: var(--ink); }
 
+/* reports */
+.listbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 2px 10px; }
+.report { display: grid; gap: 18px; padding-bottom: 40px; }
+.report .card { padding: 20px 22px; animation: none; }
+.rrow { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; margin-top: 16px; }
+.rrow label { flex: 1 1 170px; min-width: 140px; }
+.rrow .link { padding-bottom: 10px; }
+.stat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.stat .n { font: 500 56px/1 var(--serif); letter-spacing: -1.5px; color: var(--ink); }
+.stat-text { display: grid; gap: 2px; }
+.stat .btn { margin-left: auto; }
+.cards2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.rt-title { margin: 0 0 4px; font: 500 24px/1.2 var(--serif); letter-spacing: -0.2px; }
+.rt-title + .muted { margin: 0; }
+.rt-wrap { overflow-x: auto; margin-top: 12px; }
+table.rt { width: 100%; border-collapse: collapse; }
+.rt th { text-align: left; padding: 0 10px 8px; border-bottom: 1px solid var(--edge); white-space: nowrap;
+  font: 600 10.5px var(--sans); letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.rt td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); color: var(--soft); font-size: 14px; }
+.rt tbody tr:last-child td { border-bottom: 0; }
+.rt .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rt .nowrap { white-space: nowrap; }
+.rt .bar-col { width: 45%; }
+.rt .pill { display: inline-block; }
+.rt tbody tr.click { cursor: pointer; }
+.rt tbody tr.click:hover td { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+.rt tbody tr.on td { background: var(--sky-soft); color: var(--ink); }
+.bar { height: 4px; margin-top: 6px; border-radius: 999px; background: rgba(127, 179, 230, 0.55); }
+.rt .num .bar { margin-left: auto; }
+/* the date pickers' own icons are black, invisible on the navy fields */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.55; cursor: pointer; }
+
 * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
@@ -185,6 +218,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--sky); }
   .card { padding: 16px; }
   .tabs { gap: 18px; }
   .btn { padding: 8px 14px; }
+  .cards2 { grid-template-columns: 1fr; }
+  .stat .n { font-size: 44px; }
+  .stat .btn { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
